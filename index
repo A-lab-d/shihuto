@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>シフト管理 - Firebase連携版</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f0f2f5; --accent: #2c3e50; --primary: #3498db; --border-color: #333;
+            --color-1: #ffadad; --color-2: #a0c4ff; --color-3: #fdffb6; --color-4: #caffbf; --color-m: #d1d1d1;
+        }
+        body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .registration-form { background: var(--accent); padding: 12px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 10px; }
+        .registration-form input { flex-grow: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: none; }
+        .add-btn { background: var(--primary); color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        
+        .board-container { flex-grow: 1; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; min-height: 0; }
+        .left-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 2fr 3fr; gap: 10px; }
+        .right-grid { display: grid; grid-template-rows: repeat(4, 1fr); gap: 10px; }
+        #working-col { grid-column: 1 / span 2; }
+        .column { background: #fff; border: 2px solid var(--border-color); border-radius: 4px; display: flex; flex-direction: column; padding: 5px; min-height: 0; }
+        .column-title { font-size: 0.9rem; text-align: center; border-bottom: 1px solid #ccc; font-weight: bold; margin-bottom: 5px; }
+        
+        .list-group { flex-grow: 1; overflow-y: auto; padding: 5px; min-height: 50px; }
+        .staff-card { border: 1px solid #888; border-radius: 25px; padding: 8px 16px; margin: 4px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); touch-action: none; }
+        .staff-card[data-grade="1年"] { background-color: var(--color-1); }
+        .staff-card[data-grade="2年"] { background-color: var(--color-2); }
+        .staff-card[data-grade="3年"] { background-color: var(--color-3); }
+        .staff-card[data-grade="4年"] { background-color: var(--color-4); }
+        .staff-card[data-grade="院生"] { background-color: var(--color-m); }
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.9rem; }
+        .no-timer .timer-display { display: none; }
+        .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; }
+    </style>
+</head>
+<body>
+
+<div class="registration-form">
+    <input type="text" id="inputName" placeholder="名前を入力">
+    <button type="button" class="add-btn" id="addBtn">追加</button>
+</div>
+
+<div class="board-container">
+    <div class="left-grid">
+        <div class="column" id="working-col"><div class="column-title">対応 (2h)</div><div id="working" class="list-group" data-timer="true" data-limit="120"></div></div>
+        <div class="column no-timer"><div class="column-title">空き</div><div id="waiting" class="list-group" data-timer="false"></div></div>
+        <div class="column"><div class="column-title">休み (45m)</div><div id="break" class="list-group" data-timer="true" data-limit="45"></div></div>
+    </div>
+    <div class="right-grid">
+        <div class="column no-timer"><div class="column-title">受付</div><div id="reception" class="list-group" data-timer="false"></div></div>
+        <div class="column no-timer"><div class="column-title">KLAS</div><div id="klas" class="list-group" data-timer="false"></div></div>
+        <div class="column no-timer"><div class="column-title">住まい</div><div id="housing" class="list-group" data-timer="false"></div></div>
+        <div class="column no-timer"><div class="column-title">説明会</div><div id="briefing" class="list-group" data-timer="false"></div></div>
+    </div>
+</div>
+
+<script>
+    // --- Firebase初期設定 (あなたのプロジェクト情報を入れてください) ---
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('shift_data');
+
+    // データの読み込みと反映
+    db.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        renderBoard(data);
+    });
+
+    function renderBoard(data) {
+        // 全リストを一旦クリア
+        document.querySelectorAll('.list-group').forEach(el => el.innerHTML = '');
+        
+        Object.keys(data).forEach(id => {
+            const staff = data[id];
+            const card = document.createElement('div');
+            card.className = 'staff-card';
+            card.setAttribute('data-id', id);
+            card.setAttribute('data-grade', staff.grade || '');
+            card.innerHTML = `<span class="staff-name">${staff.name}</span><span class="timer-display">${formatTime(staff.seconds)}</span>`;
+            
+            // 時間超過チェック
+            const colEl = document.getElementById(staff.position);
+            if (colEl && colEl.dataset.timer === "true") {
+                const limit = parseInt(colEl.dataset.limit);
+                if (Math.floor(staff.seconds / 60) >= limit) card.classList.add('status-warning');
+            }
+            
+            const targetCol = document.getElementById(staff.position) || document.getElementById('waiting');
+            targetCol.appendChild(card);
+        });
+    }
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    // 追加処理
+    document.getElementById('addBtn').onclick = () => {
+        const name = document.getElementById('inputName').value.trim();
+        if (!name) return;
+        const id = 's' + Date.now();
+        db.child(id).set({ name, grade: '', position: 'waiting', seconds: 0 });
+        document.getElementById('inputName').value = '';
+    };
+
+    // 並び替え・移動の保存
+    document.querySelectorAll('.list-group').forEach(el => {
+        new Sortable(el, {
+            group: 'shared', animation: 150, delay: 100, delayOnTouchOnly: true,
+            onEnd: (evt) => {
+                const id = evt.item.getAttribute('data-id');
+                const newPos = evt.to.id;
+                db.child(id).update({ position: newPos, seconds: 0 });
+            }
+        });
+    });
+
+    // 1秒ごとにタイマー更新（DBへ反映）
+    setInterval(() => {
+        document.querySelectorAll('.list-group[data-timer="true"]').forEach(col => {
+            col.querySelectorAll('.staff-card').forEach(card => {
+                const id = card.getAttribute('data-id');
+                db.child(id).child('seconds').transaction(current => (current || 0) + 1);
+            });
+        });
+    }, 1000);
+</script>
+</body>
+</html>
