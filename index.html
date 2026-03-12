@@ -14,7 +14,12 @@
     <style>
         :root {
             --bg-color: #f0f2f5; --accent: #2c3e50; --primary: #3498db; --danger: #e74c3c;
-            --color-1: #ffadad; --color-2: #a0c4ff; --color-3: #fdffb6; --color-4: #caffbf; --color-m: #d1d1d1;
+            /* 学年のカラー設定（文字が見やすいパステル調） */
+            --color-1: #ffadad; /* 1年: 赤 */
+            --color-2: #a0c4ff; /* 2年: 青 */
+            --color-3: #fdffb6; /* 3年: 黄 */
+            --color-4: #caffbf; /* 4年: 緑 */
+            --color-m: #d1d1d1; /* 修士以上: 灰 */
         }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; touch-action: manipulation; }
         body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -41,11 +46,13 @@
             display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; touch-action: none;
         }
+        
+        /* 学年ごとの背景色指定（「院生」を「修士以上」に変更） */
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
         .staff-card[data-grade="2年"] { background-color: var(--color-2); }
         .staff-card[data-grade="3年"] { background-color: var(--color-3); }
         .staff-card[data-grade="4年"] { background-color: var(--color-4); }
-        .staff-card[data-grade="院生"] { background-color: var(--color-m); }
+        .staff-card[data-grade="修士以上"] { background-color: var(--color-m); }
         
         .staff-name { font-weight: bold; font-size: 1.1rem; color: #333; }
         .timer-display { font-family: monospace; font-weight: bold; font-size: 1rem; color: #444; }
@@ -94,9 +101,11 @@
             <label>学年</label>
             <select id="editGrade">
                 <option value="">未設定</option>
-                <option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option>
-                <option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option>
-                <option value="院生">院生 (灰)</option>
+                <option value="1年">1年 (赤)</option>
+                <option value="2年">2年 (青)</option>
+                <option value="3年">3年 (黄)</option>
+                <option value="4年">4年 (緑)</option>
+                <option value="修士以上">修士以上 (灰)</option>
             </select>
         </div>
         <div class="modal-item"><label>学科</label><input type="text" id="editDept"></div>
@@ -113,7 +122,7 @@
     const firebaseConfig = {
         apiKey: "AIzaSyCQl7uzYOTnsNP7qoHHKzOki2xucHp23kU",
         authDomain: "shihuto-31834.firebaseapp.com",
-        databaseURL: "https://shihuto-31834-default-rtdb.firebaseio.com/", // 推測されるURL
+        databaseURL: "https://shihuto-31834-default-rtdb.firebaseio.com/", 
         projectId: "shihuto-31834",
         storageBucket: "shihuto-31834.firebasestorage.app",
         messagingSenderId: "147810720189",
