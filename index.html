@@ -14,7 +14,7 @@
     <style>
         :root {
             --bg-color: #f0f2f5; --accent: #2c3e50; --primary: #3498db; --danger: #e74c3c;
-            /* 学年のカラー設定（文字が見やすいパステル調） */
+            /* 学年のカラー設定 */
             --color-1: #ffadad; /* 1年: 赤 */
             --color-2: #a0c4ff; /* 2年: 青 */
             --color-3: #fdffb6; /* 3年: 黄 */
@@ -24,12 +24,10 @@
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; touch-action: manipulation; }
         body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* 登録フォーム */
         .registration-form { background: var(--accent); padding: 12px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
         .registration-form input { flex-grow: 1; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: bold; font-size: 18px; cursor: pointer; }
 
-        /* レイアウト（画像配置再現） */
         .board-container { flex-grow: 1; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; min-height: 0; }
         .left-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 2fr 3fr; gap: 10px; }
         .right-grid { display: grid; grid-template-rows: repeat(4, 1fr); gap: 10px; }
@@ -39,7 +37,6 @@
         .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; flex-shrink: 0; }
         .column-title { font-size: 1rem; margin: 4px 0; font-weight: bold; }
 
-        /* スタッフチップ */
         .list-group { flex-grow: 1; overflow-y: auto; padding: 5px; -webkit-overflow-scrolling: touch; }
         .staff-card {
             border: 1px solid #888; border-radius: 25px; padding: 8px 18px; margin: 4px;
@@ -47,7 +44,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; touch-action: none;
         }
         
-        /* 学年ごとの背景色指定 */
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
         .staff-card[data-grade="2年"] { background-color: var(--color-2); }
         .staff-card[data-grade="3年"] { background-color: var(--color-3); }
@@ -60,7 +56,6 @@
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
-        /* モーダル */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 450px; }
         .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
@@ -132,39 +127,47 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('staff_data');
+    let localDataCache = {};
     let currentEditId = null;
 
-    // データのリアルタイム受信と描画
+    // データのリアルタイム受信（差分のみ更新してDOMの破壊を防ぐ）
     db.on('value', (snapshot) => {
-        const data = snapshot.val() || {};
-        renderBoard(data);
-    });
+        localDataCache = snapshot.val() || {};
+        
+        // 1. 削除されたカードを画面から消す
+        document.querySelectorAll('.staff-card').forEach(card => {
+            if (!localDataCache[card.getAttribute('data-id')]) card.remove();
+        });
 
-    function renderBoard(data) {
-        document.querySelectorAll('.list-group').forEach(el => el.innerHTML = '');
-        Object.keys(data).forEach(id => {
-            const staff = data[id];
-            const card = document.createElement('div');
-            card.className = 'staff-card';
-            card.setAttribute('data-id', id);
-            if(staff.grade) card.setAttribute('data-grade', staff.grade);
+        // 2. 新しいカードの追加、既存カードの情報更新
+        Object.keys(localDataCache).forEach(id => {
+            const staff = localDataCache[id];
+            let card = document.querySelector(`.staff-card[data-id="${id}"]`);
             
-            const minutes = Math.floor(staff.seconds / 60);
-            const seconds = staff.seconds % 60;
-            const timeStr = `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
-            
-            card.innerHTML = `<span class="staff-name">${staff.name}</span><span class="timer-display">${timeStr}</span>`;
-            card.onclick = () => openModal(id, staff);
-            
-            const colEl = document.getElementById(staff.position);
-            if(colEl && colEl.dataset.timer === "true" && minutes >= parseInt(colEl.dataset.limit)) {
-                card.classList.add('status-warning');
+            if (!card) {
+                // カードが存在しない場合のみ新規作成
+                card = document.createElement('div');
+                card.className = 'staff-card';
+                card.setAttribute('data-id', id);
+                card.innerHTML = `<span class="staff-name"></span><span class="timer-display">00:00</span>`;
+                card.onclick = () => openModal(id, localDataCache[id]);
             }
             
-            const targetCol = colEl || document.getElementById('waiting');
-            targetCol.appendChild(card);
+            // テキストと色の更新
+            card.querySelector('.staff-name').innerText = staff.name;
+            if(staff.grade) card.setAttribute('data-grade', staff.grade);
+            else card.removeAttribute('data-grade');
+            
+            // 正しいエリアに配置（ドラッグ中は邪魔しない）
+            const targetCol = document.getElementById(staff.position) || document.getElementById('waiting');
+            if (card.parentElement !== targetCol) {
+                targetCol.appendChild(card);
+            }
         });
-    }
+
+        // 描画直後にタイマーを合わせる
+        updateTimers();
+    });
 
     // スタッフ追加
     document.getElementById('addBtn').onclick = addStaff;
@@ -173,28 +176,29 @@
         const name = nameInput.value.trim();
         if (!name) return;
         const id = 's' + Date.now();
-        db.child(id).set({ name, grade: '', dept: '', memo: '', position: 'waiting', seconds: 0 });
+        // ★修正点: 秒数ではなく「開始時刻」を保存する
+        db.child(id).set({ name, grade: '', dept: '', memo: '', position: 'waiting', startTime: Date.now() });
         nameInput.value = '';
         nameInput.blur();
     }
 
-    // ドラッグ＆ドロップ（iPadタッチ操作最適化）
+    // ドラッグ＆ドロップ（感度最良設定）
     document.querySelectorAll('.list-group').forEach(el => {
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
-            delay: 50,                // 掴むまでの時間を短く（素早く反応）
-            delayOnTouchOnly: true,   // タッチデバイスのみ適用
-            fallbackTolerance: 5,     // 指が少しブレてもキャンセルせずに掴む（最重要）
+            delay: 50, 
+            delayOnTouchOnly: true, 
+            fallbackTolerance: 5,
             onEnd: (evt) => {
                 const id = evt.item.getAttribute('data-id');
                 const newPos = evt.to.id;
-                db.child(id).update({ position: newPos, seconds: 0 });
+                // ★修正点: エリア移動時に「現在の時刻」を上書き保存する
+                db.child(id).update({ position: newPos, startTime: Date.now() });
             }
         });
     });
 
-    // 詳細編集
     function openModal(id, staff) {
         currentEditId = id;
         document.getElementById('editName').value = staff.name;
@@ -220,15 +224,41 @@
         }
     }
 
-    // タイマー加算処理
-    setInterval(() => {
-        document.querySelectorAll('.list-group[data-timer="true"]').forEach(col => {
-            col.querySelectorAll('.staff-card').forEach(card => {
-                const id = card.getAttribute('data-id');
-                db.child(id).child('seconds').transaction(current => (current || 0) + 1);
-            });
+    // タイマー計算・表示処理（通信せず、ブラウザ内だけで時計を進める）
+    function updateTimers() {
+        const now = Date.now();
+        document.querySelectorAll('.staff-card').forEach(card => {
+            const id = card.getAttribute('data-id');
+            const staff = localDataCache[id];
+            if (!staff) return;
+
+            const colEl = card.closest('.list-group');
+            if (!colEl) return;
+
+            if (colEl.dataset.timer === "true") {
+                // 開始時刻から現在までの差分を計算
+                const start = staff.startTime || now;
+                const elapsedSec = Math.floor((now - start) / 1000);
+                const m = Math.floor(elapsedSec / 60);
+                const s = elapsedSec % 60;
+                
+                card.querySelector('.timer-display').innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+                const limit = parseInt(colEl.dataset.limit) || 0;
+                if (limit > 0 && m >= limit) {
+                    card.classList.add('status-warning');
+                } else {
+                    card.classList.remove('status-warning');
+                }
+            } else {
+                // タイマー対象外のエリア
+                card.classList.remove('status-warning');
+            }
         });
-    }, 1000);
+    }
+
+    // 1秒ごとに「表示だけ」更新する
+    setInterval(updateTimers, 1000);
 </script>
 </body>
 </html>
