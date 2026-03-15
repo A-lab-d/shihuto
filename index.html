@@ -38,12 +38,23 @@
         .column-title { font-size: 1rem; margin: 4px 0; font-weight: bold; }
 
         .list-group { flex-grow: 1; overflow-y: auto; padding: 5px; -webkit-overflow-scrolling: touch; }
+        
+        /* ★改善点：カードのタッチ範囲拡大とタッチ妨害の排除 */
         .staff-card {
-            border: 1px solid #888; border-radius: 25px; padding: 8px 18px; margin: 4px;
+            border: 1px solid #888; border-radius: 25px; 
+            padding: 12px 20px; /* 上下の余白を広げて押しやすく */
+            margin: 5px;
             display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; touch-action: none;
-            /* ドラッグ中の要素が他のタッチを邪魔しないようにする */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; 
+            touch-action: none;
             user-select: none;
+            -webkit-user-select: none;
+            min-height: 48px; /* Apple推奨の最小タッチサイズを確保 */
+        }
+        
+        /* ★改善点：文字部分がタッチ判定を吸い込まないようにする魔法 */
+        .staff-name, .timer-display {
+            pointer-events: none;
         }
         
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
@@ -53,7 +64,7 @@
         .staff-card[data-grade="修士以上"] { background-color: var(--color-m); }
         
         .staff-name { font-weight: bold; font-size: 1.1rem; color: #333; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 1rem; color: #444; }
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 1.1rem; color: #444; }
         .no-timer .timer-display { display: none; }
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
@@ -175,32 +186,20 @@
         nameInput.blur();
     }
 
-    // ★エリアごとにドラッグ感度を分ける処理★
+    // ★改善点：全エリアで高感度＆高許容のタッチ設定に統一
     const handleDragEnd = (evt) => {
         const id = evt.item.getAttribute('data-id');
         const newPos = evt.to.id;
         db.child(id).update({ position: newPos, startTime: Date.now() });
     };
 
-    // 1. 「対応」「休み」（タイマーあり）のエリア：超高感度設定
-    document.querySelectorAll('.list-group[data-timer="true"]').forEach(el => {
+    document.querySelectorAll('.list-group').forEach(el => {
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
-            delay: 0,                // 待たずに即座に掴む
-            fallbackTolerance: 10,   // 指のブレを大きく許容（滑りにくい）
-            onEnd: handleDragEnd
-        });
-    });
-
-    // 2. その他のエリア：通常設定
-    document.querySelectorAll('.list-group[data-timer="false"]').forEach(el => {
-        new Sortable(el, {
-            group: 'shared', 
-            animation: 150, 
-            delay: 50, 
+            delay: 50,               // 0.05秒のディレイ（タップとドラッグの判別に最適）
             delayOnTouchOnly: true, 
-            fallbackTolerance: 5,
+            fallbackTolerance: 10,   // 指のブレを10pxまで許容（斜めに触っても掴める）
             onEnd: handleDragEnd
         });
     });
@@ -230,11 +229,10 @@
         }
     }
 
-    // タイマー計算・表示処理
     function updateTimers() {
         const now = Date.now();
         document.querySelectorAll('.staff-card').forEach(card => {
-            // ★超重要：掴んでいる最中のカードはテキストの更新をストップしてタッチの中断を防ぐ★
+            // ドラッグ中のカードはタイマー描画を止めてタッチを邪魔しない
             if (card.classList.contains('sortable-drag') || card.classList.contains('sortable-ghost')) {
                 return;
             }
