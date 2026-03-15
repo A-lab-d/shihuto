@@ -47,7 +47,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; touch-action: none;
         }
         
-        /* 学年ごとの背景色指定（「院生」を「修士以上」に変更） */
+        /* 学年ごとの背景色指定 */
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
         .staff-card[data-grade="2年"] { background-color: var(--color-2); }
         .staff-card[data-grade="3年"] { background-color: var(--color-3); }
@@ -178,10 +178,14 @@
         nameInput.blur();
     }
 
-    // ドラッグ＆ドロップ
+    // ドラッグ＆ドロップ（iPadタッチ操作最適化）
     document.querySelectorAll('.list-group').forEach(el => {
         new Sortable(el, {
-            group: 'shared', animation: 150, delay: 150, delayOnTouchOnly: true,
+            group: 'shared', 
+            animation: 150, 
+            delay: 50,                // 掴むまでの時間を短く（素早く反応）
+            delayOnTouchOnly: true,   // タッチデバイスのみ適用
+            fallbackTolerance: 5,     // 指が少しブレてもキャンセルせずに掴む（最重要）
             onEnd: (evt) => {
                 const id = evt.item.getAttribute('data-id');
                 const newPos = evt.to.id;
