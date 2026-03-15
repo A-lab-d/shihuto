@@ -14,12 +14,7 @@
     <style>
         :root {
             --bg-color: #f0f2f5; --accent: #2c3e50; --primary: #3498db; --danger: #e74c3c;
-            /* 学年のカラー設定 */
-            --color-1: #ffadad; /* 1年: 赤 */
-            --color-2: #a0c4ff; /* 2年: 青 */
-            --color-3: #fdffb6; /* 3年: 黄 */
-            --color-4: #caffbf; /* 4年: 緑 */
-            --color-m: #d1d1d1; /* 修士以上: 灰 */
+            --color-1: #ffadad; --color-2: #a0c4ff; --color-3: #fdffb6; --color-4: #caffbf; --color-m: #d1d1d1;
         }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; touch-action: manipulation; }
         body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -33,26 +28,39 @@
         .right-grid { display: grid; grid-template-rows: repeat(4, 1fr); gap: 10px; }
         #working-col { grid-column: 1 / span 2; }
         
-        .column { background: #fff; border: 2px solid #333; border-radius: 4px; display: flex; flex-direction: column; padding: 5px; min-height: 0; }
-        .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; flex-shrink: 0; }
-        .column-title { font-size: 1rem; margin: 4px 0; font-weight: bold; }
+        .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 0; }
+        .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; flex-shrink: 0; }
+        .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
-        .list-group { flex-grow: 1; overflow-y: auto; padding: 5px; -webkit-overflow-scrolling: touch; }
+        /* ★リストエリアの設定を強化（カードが横幅いっぱいになるようにする） */
+        .list-group { 
+            flex-grow: 1; overflow-y: auto; padding: 2px; 
+            -webkit-overflow-scrolling: touch; 
+            display: flex; flex-direction: column; gap: 8px; /* カード同士の隙間 */
+        }
         
-        /* ★改善点：カードのタッチ範囲拡大とタッチ妨害の排除 */
+        /* ★カード（タグ）の物理サイズとタッチ判定を極大化 */
         .staff-card {
-            border: 1px solid #888; border-radius: 25px; 
-            padding: 12px 20px; /* 上下の余白を広げて押しやすく */
-            margin: 5px;
-            display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; 
+            border: 1px solid #777; 
+            border-radius: 12px; /* 少し四角くして面を広く */
+            padding: 16px 15px; /* 上下の厚みを大幅アップ */
+            display: flex; 
+            justify-content: space-between; /* 名前を左、時間を右に配置 */
+            align-items: center; 
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.12); 
+            background: white; 
+            min-height: 60px; /* ★絶対に押し外さない巨大サイズ */
+            width: 100%; /* ★横幅をエリアいっぱいに広げる */
+            
+            /* iPadタッチ特化の魔法 */
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
-            min-height: 48px; /* Apple推奨の最小タッチサイズを確保 */
+            -webkit-touch-callout: none; /* 長押し時のiOSメニューを完全封印 */
         }
         
-        /* ★改善点：文字部分がタッチ判定を吸い込まないようにする魔法 */
+        /* 文字がタッチを邪魔しないようにする */
         .staff-name, .timer-display {
             pointer-events: none;
         }
@@ -63,21 +71,23 @@
         .staff-card[data-grade="4年"] { background-color: var(--color-4); }
         .staff-card[data-grade="修士以上"] { background-color: var(--color-m); }
         
-        .staff-name { font-weight: bold; font-size: 1.1rem; color: #333; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 1.1rem; color: #444; }
+        .staff-name { font-weight: bold; font-size: 1.2rem; color: #333; }
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 1.2rem; color: #444; background: rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 6px; }
         .no-timer .timer-display { display: none; }
+        
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
-        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
+        /* モーダル */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 450px; }
-        .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
-        .modal-item label { font-size: 0.9rem; color: #666; margin-bottom: 4px; }
-        .modal-item input, .modal-item select, .modal-item textarea { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; }
-        .btn-save { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; }
-        .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 25px; border-radius: 8px; }
-        .btn-close { background: #999; color: white; border: none; padding: 12px 25px; border-radius: 8px; }
+        .modal-item { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .modal-item label { font-size: 1rem; color: #666; margin-bottom: 6px; font-weight: bold; }
+        .modal-item input, .modal-item select, .modal-item textarea { padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 18px; }
+        .modal-actions { display: flex; justify-content: space-between; margin-top: 25px; }
+        .btn-save { background: var(--primary); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-weight: bold; font-size: 16px; }
+        .btn-delete { background: var(--danger); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; }
+        .btn-close { background: #999; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -103,7 +113,7 @@
 
 <div id="modalOverlay" onclick="if(event.target==this) closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
-        <h3 style="margin-top:0">スタッフ詳細</h3>
+        <h3 style="margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 10px;">スタッフ詳細</h3>
         <div class="modal-item"><label>氏名</label><input type="text" id="editName"></div>
         <div class="modal-item">
             <label>学年</label>
@@ -186,20 +196,20 @@
         nameInput.blur();
     }
 
-    // ★改善点：全エリアで高感度＆高許容のタッチ設定に統一
     const handleDragEnd = (evt) => {
         const id = evt.item.getAttribute('data-id');
         const newPos = evt.to.id;
         db.child(id).update({ position: newPos, startTime: Date.now() });
     };
 
+    // ★全エリアを「超高感度＆高許容」設定に統一
     document.querySelectorAll('.list-group').forEach(el => {
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
-            delay: 50,               // 0.05秒のディレイ（タップとドラッグの判別に最適）
+            delay: 30,               // 0.03秒の極短ディレイ（ほぼ即座）
             delayOnTouchOnly: true, 
-            fallbackTolerance: 10,   // 指のブレを10pxまで許容（斜めに触っても掴める）
+            fallbackTolerance: 15,   // ★指のブレを15px（かなり大きく）まで許容
             onEnd: handleDragEnd
         });
     });
@@ -232,7 +242,6 @@
     function updateTimers() {
         const now = Date.now();
         document.querySelectorAll('.staff-card').forEach(card => {
-            // ドラッグ中のカードはタイマー描画を止めてタッチを邪魔しない
             if (card.classList.contains('sortable-drag') || card.classList.contains('sortable-ghost')) {
                 return;
             }
