@@ -42,6 +42,8 @@
             border: 1px solid #888; border-radius: 25px; padding: 8px 18px; margin: 4px;
             display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; touch-action: none;
+            /* ドラッグ中の要素が他のタッチを邪魔しないようにする */
+            user-select: none;
         }
         
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
@@ -130,22 +132,18 @@
     let localDataCache = {};
     let currentEditId = null;
 
-    // データのリアルタイム受信（差分のみ更新してDOMの破壊を防ぐ）
     db.on('value', (snapshot) => {
         localDataCache = snapshot.val() || {};
         
-        // 1. 削除されたカードを画面から消す
         document.querySelectorAll('.staff-card').forEach(card => {
             if (!localDataCache[card.getAttribute('data-id')]) card.remove();
         });
 
-        // 2. 新しいカードの追加、既存カードの情報更新
         Object.keys(localDataCache).forEach(id => {
             const staff = localDataCache[id];
             let card = document.querySelector(`.staff-card[data-id="${id}"]`);
             
             if (!card) {
-                // カードが存在しない場合のみ新規作成
                 card = document.createElement('div');
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
@@ -153,49 +151,57 @@
                 card.onclick = () => openModal(id, localDataCache[id]);
             }
             
-            // テキストと色の更新
             card.querySelector('.staff-name').innerText = staff.name;
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
             else card.removeAttribute('data-grade');
             
-            // 正しいエリアに配置（ドラッグ中は邪魔しない）
             const targetCol = document.getElementById(staff.position) || document.getElementById('waiting');
             if (card.parentElement !== targetCol) {
                 targetCol.appendChild(card);
             }
         });
 
-        // 描画直後にタイマーを合わせる
         updateTimers();
     });
 
-    // スタッフ追加
     document.getElementById('addBtn').onclick = addStaff;
     function addStaff() {
         const nameInput = document.getElementById('inputName');
         const name = nameInput.value.trim();
         if (!name) return;
         const id = 's' + Date.now();
-        // ★修正点: 秒数ではなく「開始時刻」を保存する
         db.child(id).set({ name, grade: '', dept: '', memo: '', position: 'waiting', startTime: Date.now() });
         nameInput.value = '';
         nameInput.blur();
     }
 
-    // ドラッグ＆ドロップ（感度最良設定）
-    document.querySelectorAll('.list-group').forEach(el => {
+    // ★エリアごとにドラッグ感度を分ける処理★
+    const handleDragEnd = (evt) => {
+        const id = evt.item.getAttribute('data-id');
+        const newPos = evt.to.id;
+        db.child(id).update({ position: newPos, startTime: Date.now() });
+    };
+
+    // 1. 「対応」「休み」（タイマーあり）のエリア：超高感度設定
+    document.querySelectorAll('.list-group[data-timer="true"]').forEach(el => {
+        new Sortable(el, {
+            group: 'shared', 
+            animation: 150, 
+            delay: 0,                // 待たずに即座に掴む
+            fallbackTolerance: 10,   // 指のブレを大きく許容（滑りにくい）
+            onEnd: handleDragEnd
+        });
+    });
+
+    // 2. その他のエリア：通常設定
+    document.querySelectorAll('.list-group[data-timer="false"]').forEach(el => {
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
             delay: 50, 
             delayOnTouchOnly: true, 
             fallbackTolerance: 5,
-            onEnd: (evt) => {
-                const id = evt.item.getAttribute('data-id');
-                const newPos = evt.to.id;
-                // ★修正点: エリア移動時に「現在の時刻」を上書き保存する
-                db.child(id).update({ position: newPos, startTime: Date.now() });
-            }
+            onEnd: handleDragEnd
         });
     });
 
@@ -224,10 +230,15 @@
         }
     }
 
-    // タイマー計算・表示処理（通信せず、ブラウザ内だけで時計を進める）
+    // タイマー計算・表示処理
     function updateTimers() {
         const now = Date.now();
         document.querySelectorAll('.staff-card').forEach(card => {
+            // ★超重要：掴んでいる最中のカードはテキストの更新をストップしてタッチの中断を防ぐ★
+            if (card.classList.contains('sortable-drag') || card.classList.contains('sortable-ghost')) {
+                return;
+            }
+
             const id = card.getAttribute('data-id');
             const staff = localDataCache[id];
             if (!staff) return;
@@ -236,7 +247,6 @@
             if (!colEl) return;
 
             if (colEl.dataset.timer === "true") {
-                // 開始時刻から現在までの差分を計算
                 const start = staff.startTime || now;
                 const elapsedSec = Math.floor((now - start) / 1000);
                 const m = Math.floor(elapsedSec / 60);
@@ -251,13 +261,11 @@
                     card.classList.remove('status-warning');
                 }
             } else {
-                // タイマー対象外のエリア
                 card.classList.remove('status-warning');
             }
         });
     }
 
-    // 1秒ごとに「表示だけ」更新する
     setInterval(updateTimers, 1000);
 </script>
 </body>
