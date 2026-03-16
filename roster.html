@@ -22,7 +22,6 @@
         .add-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
         .back-btn { background: #7f8c8d; color: white; border: none; border-radius: 12px; padding: 0 20px; font-weight: bold; cursor: pointer; }
 
-        /* 大枠の2カラムレイアウト */
         .roster-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; align-items: start; }
         .roster-column { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; border: 2px solid #ddd; }
         
@@ -30,18 +29,15 @@
         .present-header { background: #e8f8f5; color: #27ae60; border-color: #a3e4d7; }
         .absent-header { background: #fdf2e9; color: #d35400; border-color: #f5cba7; }
         
-        /* 出勤人数の集計エリア */
         .stats-area { margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 0.95rem; font-weight: normal; color: #333; line-height: 1.5; border: 1px solid rgba(0,0,0,0.1); }
         .stats-number { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
 
-        /* 役職ごとのサブエリア */
         .sub-area { border-bottom: 2px solid #eee; display: flex; flex-direction: column; min-height: 130px; }
         .sub-area:last-child { border-bottom: none; }
         .sub-header { background: #f8f9fa; padding: 8px 15px; font-size: 0.95rem; font-weight: bold; color: #555; border-bottom: 1px solid #eee; }
         
         .list-group { flex-grow: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; min-height: 80px; }
         
-        /* 名簿用カードデザイン */
         .staff-card {
             border: 1px solid #ccc; border-radius: 8px; padding: 12px;
             display: flex; flex-direction: column; gap: 4px; cursor: pointer;
@@ -63,7 +59,6 @@
         
         .sortable-ghost { opacity: 0.4; background-color: #f0f0f0; border: 2px dashed #999; }
 
-        /* モーダル（縦に長くなるのでスクロールできるように） */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto; }
         .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
@@ -177,7 +172,6 @@
         Object.keys(localDataCache).forEach(id => {
             const staff = localDataCache[id];
             
-            // 人数集計（出勤している人のみカウント）
             if (staff.position !== 'absent') {
                 if (staff.role === 'フリー') cFree++;
                 if (staff.role === '住まい') cHousing++;
@@ -201,7 +195,6 @@
             `;
             card.onclick = () => openModal(id, staff);
             
-            // 出勤状況と役職を判定して、正しいサブエリアに振り分ける
             const status = staff.position === 'absent' ? 'absent' : 'present';
             const role = staff.role || 'その他';
             const targetCol = document.getElementById(`${status}-${role}`);
@@ -211,7 +204,6 @@
             }
         });
 
-        // 集計結果を画面に反映
         document.getElementById('count-free').innerText = cFree;
         document.getElementById('count-housing').innerText = cHousing;
         document.getElementById('count-klas').innerText = cKlas;
@@ -223,29 +215,51 @@
         const name = nameInput.value.trim();
         if (!name) return;
         const id = 's' + Date.now();
-        // ★新規追加時は、役職・発表なども空で「未出勤」の「その他」に配置される
         db.child(id).set({ name, grade: '', dept: '', memo: '', role: '', presenter: '', position: 'absent', startTime: null });
         nameInput.value = '';
     };
 
-    // ★ドラッグ＆ドロップで「出勤/未出勤」と「役職」を同時に変更する魔法
+    // ★重要：役職による移動制限と、初期配置の自動振り分け設定
     document.querySelectorAll('.list-group').forEach(el => {
+        const listRole = el.getAttribute('data-role'); // このリストが持つ役職
+        
         new Sortable(el, {
-            group: 'shared', animation: 150, fallbackTolerance: 5,
+            // グループ名を「役職名」に設定することで、同じ役職のリスト間でのみ移動可能にする
+            group: 'role-group-' + listRole, 
+            animation: 150, 
+            fallbackTolerance: 5,
+            
             onEnd: (evt) => {
+                // 同じ場所での並び替え等で移動しなかった場合は無視
+                if (evt.from === evt.to) return;
+
                 const id = evt.item.getAttribute('data-id');
                 const toStatus = evt.to.getAttribute('data-status');
                 const toRole = evt.to.getAttribute('data-role');
                 
-                // ドロップ先のエリア情報に基づいてデータベースを更新
-                const newPos = toStatus === 'present' ? 'waiting' : 'absent';
-                const newRole = toRole === 'その他' ? '' : toRole; // その他に落としたら空文字にする
+                let updateData = {};
                 
-                db.child(id).update({ 
-                    position: newPos, 
-                    role: newRole,
-                    startTime: toStatus === 'present' ? Date.now() : null 
-                });
+                if (toStatus === 'present') {
+                    // ★出勤になった場合のホワイトボード初期位置マッピング
+                    let initialPos = 'waiting'; // デフォルト(フリー)は「空き」
+                    if (toRole === '住まい') initialPos = 'housing';
+                    else if (toRole === 'KLAS') initialPos = 'klas';
+                    else if (toRole === 'その他') initialPos = 'briefing'; // その他は「説明会」
+                    
+                    updateData = { 
+                        position: initialPos, 
+                        startTime: Date.now() 
+                    };
+                } else {
+                    // ★未出勤になった場合は一律で absent に
+                    updateData = { 
+                        position: 'absent', 
+                        startTime: null 
+                    };
+                }
+                
+                // データベースを更新
+                db.child(id).update(updateData);
             }
         });
     });
