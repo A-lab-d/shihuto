@@ -21,7 +21,7 @@
         .registration-form input { flex-grow: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: none; min-width: 200px; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
         
-        /* ★追加: 全員退勤ボタンのデザイン */
+        /* 退勤ボタン（メール送信の文字を消してシンプルにしました） */
         .checkout-all-btn { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-left: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         
         .back-btn { background: #7f8c8d; color: white; border: none; border-radius: 12px; padding: 0 20px; font-weight: bold; cursor: pointer; }
@@ -56,9 +56,7 @@
         .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
 
-        .staff-card[data-presenter="可"] {
-            background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%);
-        }
+        .staff-card[data-presenter="可"] { background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%); }
         
         .staff-name { font-weight: bold; font-size: 1.15rem; pointer-events: none; }
         .staff-badges { display: flex; gap: 5px; pointer-events: none; flex-wrap: wrap; }
@@ -90,7 +88,7 @@
     <div class="registration-form">
         <input type="text" id="inputName" placeholder="新しいスタッフの名前を入力" autocomplete="off">
         <button type="button" class="add-btn" id="addBtn">カードを追加</button>
-        <button type="button" class="checkout-all-btn" onclick="checkoutAllAndExport()">全員を退勤してデータを送信</button>
+        <button type="button" class="checkout-all-btn" onclick="checkoutAllAndExport()">全員を退勤してデータを保存</button>
     </div>
 </div>
 
@@ -226,7 +224,6 @@
             const roleBadge = staff.role ? `<span class="badge badge-role">${staff.role}</span>` : '';
             const presenterBadge = staff.presenter === '可' ? `<span class="badge badge-presenter">発表 可</span>` : '';
             const memoText = staff.memo ? staff.memo : '';
-            
             const deptText = staff.dept ? `(${staff.dept})` : '';
 
             card.innerHTML = `
@@ -278,33 +275,24 @@
 
     document.querySelectorAll('.list-group').forEach(el => {
         const listRole = el.getAttribute('data-role');
-        
         new Sortable(el, {
-            group: 'role-group-' + listRole, 
-            animation: 150, 
-            fallbackTolerance: 5,
-            forceFallback: true,
-            
+            group: 'role-group-' + listRole, animation: 150, fallbackTolerance: 5, forceFallback: true,
             onEnd: (evt) => {
                 if (evt.from === evt.to) return;
-
                 const id = evt.item.getAttribute('data-id');
                 const toStatus = evt.to.getAttribute('data-status');
                 const toRole = evt.to.getAttribute('data-role');
                 
                 let updateData = {};
-                
                 if (toStatus === 'present') {
                     let initialPos = 'waiting'; 
                     if (toRole === '住まい') initialPos = 'housing';
                     else if (toRole === 'KLAS') initialPos = 'klas';
                     else if (toRole === 'その他') initialPos = 'briefing'; 
-                    
                     updateData = { position: initialPos, startTime: Date.now() };
                 } else {
                     updateData = { position: 'absent', startTime: null };
                 }
-                
                 db.child(id).update(updateData);
             }
         });
@@ -351,7 +339,6 @@
             if (role === '住まい') initialPos = 'housing';
             else if (role === 'KLAS') initialPos = 'klas';
             else if (role === 'その他' || role === '') initialPos = 'briefing'; 
-            
             updateData.position = initialPos;
             updateData.startTime = Date.now();
         } else {
@@ -370,20 +357,25 @@
         }
     }
 
-    // ★追加: 全員退勤＆データ出力処理
+    // ★修正: PCでの操作確認、CSVダウンロード、全自動クリア
     async function checkoutAllAndExport() {
-        if(!confirm("出勤中のスタッフを全員「未出勤」にし、本日のラップタイムデータをCSVで出力しますか？")) return;
+        // 1. PCでの操作か確認
+        if (!confirm("パソコンでこの操作を行っていますか？\n（ファイルのダウンロードとデータのリセットを行うため、パソコンでの操作を推奨します）")) {
+            return; // 「いいえ」ならここで中止
+        }
+
+        // 2. CSV出力と退勤の最終確認
+        if (!confirm("csvで出力しますか?\n（※「はい」を押すとCSVがダウンロードされ、全員が退勤処理され、今日のラップタイムデータがリセットされます）")) {
+            return; // 「いいえ」ならここで中止
+        }
 
         try {
-            // 1. データの取得
             const historySnap = await firebase.database().ref('lap_history').once('value');
             const historyData = historySnap.val();
             
             const staffSnap = await firebase.database().ref('staff_data').once('value');
             const staffData = staffSnap.val() || {};
 
-            // 2. CSVデータの生成 (Excelで開ける形式)
-            // Excelが文字化けしないようにBOM(Byte Order Mark)を付与します
             let csvContent = "\uFEFF日時,スタッフ名,トータル対応時間(秒),物件選定中(秒),タクシー待ち(秒),内見中(秒),内見帰宅後(秒)\n";
             
             if (historyData) {
@@ -408,7 +400,7 @@
                 csvContent += "本日のラップタイム記録はありません。,,,,,,,\n";
             }
 
-            // 3. CSVファイルのダウンロード実行
+            // CSVのダウンロード
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -418,17 +410,7 @@
             a.click();
             URL.revokeObjectURL(url);
 
-            // 4. メーラーの起動 (宛先、件名、本文を自動入力)
-            const email = "hk20008@student.miyazaki-u.ac.jp";
-            const subject = encodeURIComponent(`【日報】ラップタイムデータ_${todayStr}`);
-            const body = encodeURIComponent(`お疲れ様です。\n本日のラップタイムデータCSVがダウンロードされました。\nこのメールにダウンロードしたCSVファイルを添付して送信してください。\n\n※iPadの「ファイル」アプリ（ダウンロードフォルダ等）に保存されています。`);
-            
-            // 少し待ってからメールアプリを開く（ダウンロードと競合させないため）
-            setTimeout(() => {
-                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-            }, 500);
-
-            // 5. 全員を未出勤にする
+            // 全員を未出勤にする
             const updates = {};
             Object.keys(staffData).forEach(id => {
                 if (staffData[id].position !== 'absent') {
@@ -440,12 +422,13 @@
                 await firebase.database().ref('staff_data').update(updates);
             }
 
-            // 6. 履歴のリセット（明日のためにクリア）
+            // ★ラップタイム履歴を裏側で全自動削除（確認画面なし）
+            await firebase.database().ref('lap_history').remove();
+
+            // 完了メッセージ
             setTimeout(() => {
-                if(confirm("データをダウンロードしました。\n明日の計測が混ざらないように、今日のラップタイム履歴をリセット（削除）しますか？")) {
-                    firebase.database().ref('lap_history').remove();
-                }
-            }, 1500);
+                alert("CSVのダウンロードが完了し、全員の退勤とデータのリセットが正常に行われました。\nダウンロードしたファイルをメールで送信してください。");
+            }, 500);
 
         } catch (error) {
             console.error("エラー:", error);
