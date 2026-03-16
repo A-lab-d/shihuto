@@ -39,7 +39,6 @@
         #reception, #klas, #housing, #briefing { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
         #other-working { grid-template-columns: 1fr; }
         
-        /* ★カードのデザイン（デフォルト背景色を変数化） */
         .staff-card { 
             --card-bg: #ffffff;
             background: var(--card-bg);
@@ -48,14 +47,12 @@
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease; cursor: pointer;
         }
         
-        /* 学年の色設定 */
         .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
         .staff-card[data-grade="2年"] { --card-bg: var(--color-2); }
         .staff-card[data-grade="3年"] { --card-bg: var(--color-3); }
         .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
 
-        /* ★説明会発表可の場合、右半分をオレンジ（#ffb74d）にする */
         .staff-card[data-presenter="可"] {
             background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%);
         }
@@ -74,7 +71,6 @@
 
         .roster-btn { background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; padding: 15px; width: 100%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
-        /* モーダル用 */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
         .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
@@ -85,7 +81,6 @@
         .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
         .btn-close { background: #999; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
         
-        /* 追加された出勤/未出勤ボタン用 */
         .btn-present { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
         .btn-absent { background: #e67e22; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
@@ -116,8 +111,19 @@
             <div class="modal-item" style="flex: 1;"><label>役職</label><select id="editRole"><option value="">その他 (未設定)</option><option value="フリー">フリー</option><option value="住まい">住まい</option><option value="KLAS">KLAS</option></select></div>
             <div class="modal-item" style="flex: 1;"><label>説明会発表者</label><select id="editPresenter"><option value="">未設定</option><option value="可">可</option><option value="不可">不可</option></select></div>
         </div>
-        <div class="modal-item"><label>学年</label><select id="editGrade"><option value="">未設定</option><option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option><option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option><option value="修士以上">修士以上 (灰)</option></select></div>
-        <div class="modal-item"><label>学科</label><input type="text" id="editDept"></div>
+        <div style="display: flex; gap: 10px;">
+            <div class="modal-item" style="flex: 1;"><label>学年</label><select id="editGrade"><option value="">未設定</option><option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option><option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option><option value="修士以上">修士以上 (灰)</option></select></div>
+            <div class="modal-item" style="flex: 1;">
+                <label>学科</label>
+                <select id="editDept">
+                    <option value="">未設定</option>
+                    <option value="地域">地域</option><option value="教育">教育</option><option value="医医">医医</option><option value="医看">医看</option>
+                    <option value="獣医">獣医</option><option value="動植物">動植物</option><option value="森林">森林</option><option value="海洋">海洋</option>
+                    <option value="農生命">農生命</option><option value="機械">機械</option><option value="土木">土木</option><option value="工生命">工生命</option>
+                    <option value="半導体">半導体</option><option value="電気">電気</option><option value="情報">情報</option><option value="職員">職員</option><option value="その他">その他</option>
+                </select>
+            </div>
+        </div>
         <div class="modal-item"><label>メモ</label><textarea id="editMemo" rows="2"></textarea></div>
         
         <div class="modal-actions">
@@ -182,11 +188,13 @@
                 };
             }
             
-            card.querySelector('.staff-name').innerText = staff.name;
+            // ★名前と学科を結合して表示
+            const deptText = staff.dept ? `(${staff.dept})` : '';
+            card.querySelector('.staff-name').innerText = `${staff.name}${deptText}`;
+            
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
             else card.removeAttribute('data-grade');
             
-            // ★発表可否の情報をカードに付与（CSSで右半分の色を変えるため）
             if(staff.presenter === '可') card.setAttribute('data-presenter', '可');
             else card.removeAttribute('data-presenter');
             
@@ -225,7 +233,6 @@
         new Sortable(el, { group: 'shared', animation: 150, handle: '.drag-handle', forceFallback: true, fallbackTolerance: 5, emptyInsertThreshold: 100, onEnd: handleDragEnd });
     });
 
-    // モーダルの操作
     function openModal(id, staff) {
         currentEditId = id;
         document.getElementById('editName').value = staff.name || '';
@@ -250,7 +257,6 @@
         closeModal();
     }
 
-    // ★追加: 出勤・未出勤ボタンが押された時の処理（保存も同時に行う）
     function setStatus(status) {
         const role = document.getElementById('editRole').value;
         let updateData = {

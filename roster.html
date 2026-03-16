@@ -38,7 +38,7 @@
         
         .list-group { flex-grow: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; min-height: 80px; }
         
-        /* ★名簿用カードデザイン（2色対応） */
+        /* ★カードデザイン（背景色を変数化してグラデーションに対応） */
         .staff-card {
             --card-bg: #ffffff;
             background: var(--card-bg);
@@ -53,7 +53,6 @@
         .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
 
-        /* 右半分オレンジ */
         .staff-card[data-presenter="可"] {
             background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%);
         }
@@ -62,19 +61,17 @@
         .staff-badges { display: flex; gap: 5px; pointer-events: none; flex-wrap: wrap; }
         .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .badge-role { background: rgba(0,0,0,0.1); color: #333; }
-        .badge-presenter { background: #f39c12; color: white; border: 1px solid #fff; } /* 境界線が見やすいように少し加工 */
+        .badge-presenter { background: #f39c12; color: white; border: 1px solid #fff; } 
         .staff-memo { font-size: 0.85rem; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; margin-top: 4px; background: rgba(255,255,255,0.6); padding: 0 4px; border-radius: 4px; }
         
         .sortable-ghost { opacity: 0.4; background-color: #f0f0f0 !important; border: 2px dashed #999; }
 
-        /* モーダル */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
         .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
         .modal-item label { font-size: 0.95rem; color: #666; margin-bottom: 4px; font-weight: bold; }
         .modal-item input, .modal-item select, .modal-item textarea { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
         
-        /* ボタン配置エリア */
         .modal-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
         .btn-save { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
         .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
@@ -142,16 +139,28 @@
             </div>
         </div>
 
-        <div class="modal-item">
-            <label>学年</label>
-            <select id="editGrade">
-                <option value="">未設定</option>
-                <option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option>
-                <option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option>
-                <option value="修士以上">修士以上 (灰)</option>
-            </select>
+        <div style="display: flex; gap: 10px;">
+            <div class="modal-item" style="flex: 1;">
+                <label>学年</label>
+                <select id="editGrade">
+                    <option value="">未設定</option>
+                    <option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option>
+                    <option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option>
+                    <option value="修士以上">修士以上 (灰)</option>
+                </select>
+            </div>
+            <div class="modal-item" style="flex: 1;">
+                <label>学科</label>
+                <select id="editDept">
+                    <option value="">未設定</option>
+                    <option value="地域">地域</option><option value="教育">教育</option><option value="医医">医医</option><option value="医看">医看</option>
+                    <option value="獣医">獣医</option><option value="動植物">動植物</option><option value="森林">森林</option><option value="海洋">海洋</option>
+                    <option value="農生命">農生命</option><option value="機械">機械</option><option value="土木">土木</option><option value="工生命">工生命</option>
+                    <option value="半導体">半導体</option><option value="電気">電気</option><option value="情報">情報</option><option value="職員">職員</option><option value="その他">その他</option>
+                </select>
+            </div>
         </div>
-        <div class="modal-item"><label>学科</label><input type="text" id="editDept"></div>
+
         <div class="modal-item"><label>メモ</label><textarea id="editMemo" rows="2"></textarea></div>
         
         <div class="modal-actions">
@@ -207,16 +216,18 @@
             card.setAttribute('data-id', id);
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
             
-            // ★右半分オレンジにするための属性追加
             if(staff.presenter === '可') card.setAttribute('data-presenter', '可');
             else card.removeAttribute('data-presenter');
             
             const roleBadge = staff.role ? `<span class="badge badge-role">${staff.role}</span>` : '';
             const presenterBadge = staff.presenter === '可' ? `<span class="badge badge-presenter">発表 可</span>` : '';
             const memoText = staff.memo ? staff.memo : '';
+            
+            // ★名前と学科を結合して表示
+            const deptText = staff.dept ? `(${staff.dept})` : '';
 
             card.innerHTML = `
-                <div class="staff-name">${staff.name}</div>
+                <div class="staff-name">${staff.name}${deptText}</div>
                 <div class="staff-badges">${roleBadge}${presenterBadge}</div>
                 ${memoText ? `<div class="staff-memo">${memoText}</div>` : ''}
             `;
@@ -298,7 +309,7 @@
 
     function openModal(id, staff) {
         currentEditId = id;
-        document.getElementById('editName').value = staff.name;
+        document.getElementById('editName').value = staff.name || '';
         document.getElementById('editGrade').value = staff.grade || '';
         document.getElementById('editDept').value = staff.dept || '';
         document.getElementById('editMemo').value = staff.memo || '';
@@ -321,7 +332,6 @@
         closeModal();
     }
     
-    // ★出勤・未出勤ボタンから直接ステータスを切り替える（編集内容も保存する）
     function setStatus(status) {
         const role = document.getElementById('editRole').value;
         let updateData = {
