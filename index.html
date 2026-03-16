@@ -22,8 +22,6 @@
         
         .board-container { flex-grow: 1; display: grid; grid-template-columns: 2.5fr 1fr; gap: 10px; margin-top: 10px; }
         .left-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto; gap: 10px; }
-        
-        /* 右側グリッド：名簿ボタン＋4エリアの合計5行に変更 */
         .right-grid { display: grid; grid-template-rows: auto auto auto auto auto; gap: 10px; }
         
         .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 150px; height: 100%; }
@@ -41,7 +39,7 @@
         #reception, #klas, #housing, #briefing { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
         #other-working { grid-template-columns: 1fr; }
         
-        .staff-card { border: 1px solid #777; border-radius: 8px; margin: 0; display: flex; align-items: stretch; box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; width: 100%; height: 50px; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+        .staff-card { border: 1px solid #777; border-radius: 8px; margin: 0; display: flex; align-items: stretch; box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; width: 100%; height: 50px; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease; }
         
         .drag-handle { width: 40px; background: rgba(0,0,0,0.08); color: #555; font-size: 22px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
         .card-content { padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-grow: 1; pointer-events: none; overflow: hidden; }
@@ -58,10 +56,9 @@
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-        .sortable-drag { opacity: 0.9 !important; box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important; z-index: 9999; }
+        .sortable-drag { opacity: 0.9 !important; box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important; transform: scale(1.05); z-index: 9999; }
         .sortable-ghost { opacity: 0.3; background-color: #e0e0e0 !important; border: 2px dashed #999; }
 
-        /* 名簿一覧ボタン */
         .roster-btn { background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; padding: 15px; width: 100%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     </style>
 </head>
@@ -77,7 +74,6 @@
             <div class="column-header"><h2 class="column-title" style="font-size: 0.9rem;">その他対応中</h2></div>
             <div id="other-working" class="list-group" data-timer="false"></div>
         </div>
-        
         <div class="column no-timer" id="waiting-col">
             <div class="column-header"><h2 class="column-title">空き</h2></div>
             <div id="waiting" class="list-group" data-timer="false"></div>
@@ -90,7 +86,6 @@
     
     <div class="right-grid">
         <button class="roster-btn" onclick="window.open('roster.html', '_blank')">📋 名簿一覧</button>
-        
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">受付</h2></div><div id="reception" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">KLAS</h2></div><div id="klas" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">住まい</h2></div><div id="housing" class="list-group" data-timer="false"></div></div>
@@ -113,6 +108,9 @@
     const db = firebase.database().ref('staff_data');
     let localDataCache = {};
 
+    // ★学年の優先順位（小さいほど上に表示）
+    const gradeOrder = { "": 0, "修士以上": 1, "4年": 2, "3年": 3, "2年": 4, "1年": 5 };
+
     db.on('value', (snapshot) => {
         localDataCache = snapshot.val() || {};
         
@@ -123,7 +121,6 @@
         Object.keys(localDataCache).forEach(id => {
             const staff = localDataCache[id];
             
-            // ★重要：未出勤（absent）のカードはホワイトボードに一切表示しない
             if (staff.position === 'absent') {
                 const existingCard = document.querySelector(`.staff-card[data-id="${id}"]`);
                 if (existingCard) existingCard.remove();
@@ -137,7 +134,6 @@
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
                 card.innerHTML = `<div class="drag-handle">≡</div><div class="card-content"><div class="staff-name"></div><div class="timer-display">00:00</div></div>`;
-                // クリックしてもモーダルは開かない（ホワイトボード専用）
             }
             
             card.querySelector('.staff-name').innerText = staff.name;
@@ -150,8 +146,29 @@
             }
         });
 
+        // ★「空き」エリアの自動ソート処理を実行
+        autoSort(['waiting']);
         updateTimers();
     });
+
+    // ★自動ソート関数
+    function autoSort(containerIds) {
+        // ドラッグ中の要素があればソートを一時停止（操作の邪魔をしないため）
+        if (document.querySelector('.sortable-drag') || document.querySelector('.sortable-ghost')) return;
+        
+        containerIds.forEach(id => {
+            const col = document.getElementById(id);
+            if (!col) return;
+            const cards = Array.from(col.querySelectorAll('.staff-card'));
+            cards.sort((a, b) => {
+                const gA = a.getAttribute('data-grade') || "";
+                const gB = b.getAttribute('data-grade') || "";
+                return (gradeOrder[gA] ?? 99) - (gradeOrder[gB] ?? 99);
+            });
+            // 順番通りに再度追加（DOMの並び替え）
+            cards.forEach(card => col.appendChild(card));
+        });
+    }
 
     const handleDragEnd = (evt) => {
         const id = evt.item.getAttribute('data-id');
@@ -168,7 +185,7 @@
     function updateTimers() {
         const now = Date.now();
         document.querySelectorAll('.staff-card').forEach(card => {
-            if (card.classList.contains('sortable-drag')) return;
+            if (card.classList.contains('sortable-drag') || card.classList.contains('sortable-ghost')) return;
             const id = card.getAttribute('data-id');
             const staff = localDataCache[id];
             if (!staff) return;
