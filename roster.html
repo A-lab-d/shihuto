@@ -17,9 +17,13 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding: 15px; display: flex; flex-direction: column; min-height: 100vh; }
         
         .header-controls { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
-        .registration-form { background: var(--accent); padding: 15px; border-radius: 12px; display: flex; gap: 10px; flex-grow: 1; flex-wrap: wrap; }
+        .registration-form { background: var(--accent); padding: 15px; border-radius: 12px; display: flex; gap: 10px; flex-grow: 1; flex-wrap: wrap; align-items: center; }
         .registration-form input { flex-grow: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: none; min-width: 200px; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        
+        /* ★追加: 全員退勤ボタンのデザイン */
+        .checkout-all-btn { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-left: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
         .back-btn { background: #7f8c8d; color: white; border: none; border-radius: 12px; padding: 0 20px; font-weight: bold; cursor: pointer; }
 
         .roster-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; align-items: start; }
@@ -38,7 +42,6 @@
         
         .list-group { flex-grow: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; min-height: 80px; }
         
-        /* ★カードデザイン（背景色を変数化してグラデーションに対応） */
         .staff-card {
             --card-bg: #ffffff;
             background: var(--card-bg);
@@ -87,6 +90,7 @@
     <div class="registration-form">
         <input type="text" id="inputName" placeholder="新しいスタッフの名前を入力" autocomplete="off">
         <button type="button" class="add-btn" id="addBtn">カードを追加</button>
+        <button type="button" class="checkout-all-btn" onclick="checkoutAllAndExport()">全員を退勤してデータを送信</button>
     </div>
 </div>
 
@@ -223,7 +227,6 @@
             const presenterBadge = staff.presenter === '可' ? `<span class="badge badge-presenter">発表 可</span>` : '';
             const memoText = staff.memo ? staff.memo : '';
             
-            // ★名前と学科を結合して表示
             const deptText = staff.dept ? `(${staff.dept})` : '';
 
             card.innerHTML = `
@@ -364,6 +367,89 @@
         if(confirm("このスタッフを完全に削除しますか？\n※ホワイトボードからも消えます")) {
             db.child(currentEditId).remove();
             closeModal();
+        }
+    }
+
+    // ★追加: 全員退勤＆データ出力処理
+    async function checkoutAllAndExport() {
+        if(!confirm("出勤中のスタッフを全員「未出勤」にし、本日のラップタイムデータをCSVで出力しますか？")) return;
+
+        try {
+            // 1. データの取得
+            const historySnap = await firebase.database().ref('lap_history').once('value');
+            const historyData = historySnap.val();
+            
+            const staffSnap = await firebase.database().ref('staff_data').once('value');
+            const staffData = staffSnap.val() || {};
+
+            // 2. CSVデータの生成 (Excelで開ける形式)
+            // Excelが文字化けしないようにBOM(Byte Order Mark)を付与します
+            let csvContent = "\uFEFF日時,スタッフ名,トータル対応時間(秒),物件選定中(秒),タクシー待ち(秒),内見中(秒),内見帰宅後(秒)\n";
+            
+            if (historyData) {
+                Object.keys(historyData).forEach(staffId => {
+                    const records = historyData[staffId];
+                    const staffName = staffData[staffId] ? staffData[staffId].name : '不明';
+
+                    Object.keys(records).forEach(recordId => {
+                        const r = records[recordId];
+                        const laps = r.laps_seconds || {};
+                        const date = r.date || '';
+                        const total = r.total_seconds || 0;
+                        const l1 = laps['物件選定中'] || 0;
+                        const l2 = laps['タクシー待ち'] || 0;
+                        const l3 = laps['内見中'] || 0;
+                        const l4 = laps['内見帰宅後'] || 0;
+
+                        csvContent += `"${date}","${staffName}",${total},${l1},${l2},${l3},${l4}\n`;
+                    });
+                });
+            } else {
+                csvContent += "本日のラップタイム記録はありません。,,,,,,,\n";
+            }
+
+            // 3. CSVファイルのダウンロード実行
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const todayStr = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `ラップタイム_${todayStr}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // 4. メーラーの起動 (宛先、件名、本文を自動入力)
+            const email = "hk20008@student.miyazaki-u.ac.jp";
+            const subject = encodeURIComponent(`【日報】ラップタイムデータ_${todayStr}`);
+            const body = encodeURIComponent(`お疲れ様です。\n本日のラップタイムデータCSVがダウンロードされました。\nこのメールにダウンロードしたCSVファイルを添付して送信してください。\n\n※iPadの「ファイル」アプリ（ダウンロードフォルダ等）に保存されています。`);
+            
+            // 少し待ってからメールアプリを開く（ダウンロードと競合させないため）
+            setTimeout(() => {
+                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+            }, 500);
+
+            // 5. 全員を未出勤にする
+            const updates = {};
+            Object.keys(staffData).forEach(id => {
+                if (staffData[id].position !== 'absent') {
+                    updates[`${id}/position`] = 'absent';
+                    updates[`${id}/startTime`] = null;
+                }
+            });
+            if (Object.keys(updates).length > 0) {
+                await firebase.database().ref('staff_data').update(updates);
+            }
+
+            // 6. 履歴のリセット（明日のためにクリア）
+            setTimeout(() => {
+                if(confirm("データをダウンロードしました。\n明日の計測が混ざらないように、今日のラップタイム履歴をリセット（削除）しますか？")) {
+                    firebase.database().ref('lap_history').remove();
+                }
+            }, 1500);
+
+        } catch (error) {
+            console.error("エラー:", error);
+            alert("処理中にエラーが発生しました。");
         }
     }
 </script>
