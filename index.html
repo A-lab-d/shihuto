@@ -36,31 +36,41 @@
         .registration-form input[type="text"] { flex-grow: 1; min-width: 150px; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 18px; cursor: pointer; }
 
-        /* 左側を広くし、全体を横長に使いやすくする設定 */
         .board-container { flex-grow: 1; display: grid; grid-template-columns: 2.5fr 1fr; gap: 10px; }
-        .left-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 10px; }
+        
+        /* ★改善: 左側エリアを4分割のグリッドにして比率をコントロール */
+        .left-grid { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            grid-template-rows: auto auto; 
+            gap: 10px; 
+        }
         .right-grid { display: grid; grid-template-rows: repeat(4, auto); gap: 10px; }
         
-        /* ★ドロップエリアを広げるための設定（height: 100% で枠全体をカバー） */
         .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 150px; height: 100%; }
-        #working-col { grid-column: 1 / span 2; min-height: 200px; }
+        
+        /* ★各エリアの幅割り当て */
+        #working-col { grid-column: 1 / span 3; min-height: 200px; } /* 3マス分（広い） */
+        #other-working-col { grid-column: 4 / span 1; min-height: 200px; } /* 1マス分（受付の半分の細さ） */
+        #waiting-col { grid-column: 1 / span 2; } /* 2マス分（半分の幅） */
+        #break-col { grid-column: 3 / span 2; } /* 2マス分（半分の幅） */
         
         .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; flex-shrink: 0; }
         .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
-        /* ★移動先として認識される受け皿を最大化（flex-grow: 1） */
         .list-group { 
             flex-grow: 1; 
             padding: 4px; 
             display: grid; 
             gap: 8px; 
             align-content: start; 
-            min-height: 100px; /* 空でも確実にドロップできるようにする */
+            min-height: 100px; 
         }
         
-        /* ★カードを「なるべく画面に収まる横長」に自動調整 */
+        /* ★エリアごとのカードの並び方 */
         #working, #waiting, #break { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
         #reception, #klas, #housing, #briefing { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+        #other-working { grid-template-columns: 1fr; } /* ★その他対応中は必ず1列（縦並び） */
         
         .staff-card {
             border: 1px solid #777; border-radius: 8px; margin: 0;
@@ -126,14 +136,29 @@
 <div class="registration-form">
     <input type="text" id="inputName" placeholder="氏名を追加" autocomplete="off">
     <button type="button" class="add-btn" id="addBtn">追加</button>
-    </div>
+</div>
 
 <div class="board-container" id="boardArea">
     <div class="left-grid">
-        <div class="column" id="working-col"><div class="column-header"><h2 class="column-title">対応</h2></div><div id="working" class="list-group" data-timer="true" data-limit="120"></div></div>
-        <div class="column no-timer"><div class="column-header"><h2 class="column-title">空き</h2></div><div id="waiting" class="list-group" data-timer="false"></div></div>
-        <div class="column"><div class="column-header"><h2 class="column-title">休み</h2></div><div id="break" class="list-group" data-timer="true" data-limit="45"></div></div>
+        <div class="column" id="working-col">
+            <div class="column-header"><h2 class="column-title">対応</h2></div>
+            <div id="working" class="list-group" data-timer="true" data-limit="120"></div>
+        </div>
+        <div class="column no-timer" id="other-working-col">
+            <div class="column-header"><h2 class="column-title" style="font-size: 0.9rem;">その他対応中</h2></div>
+            <div id="other-working" class="list-group" data-timer="false"></div>
+        </div>
+        
+        <div class="column no-timer" id="waiting-col">
+            <div class="column-header"><h2 class="column-title">空き</h2></div>
+            <div id="waiting" class="list-group" data-timer="false"></div>
+        </div>
+        <div class="column" id="break-col">
+            <div class="column-header"><h2 class="column-title">休み</h2></div>
+            <div id="break" class="list-group" data-timer="true" data-limit="45"></div>
+        </div>
     </div>
+    
     <div class="right-grid">
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">受付</h2></div><div id="reception" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">KLAS</h2></div><div id="klas" class="list-group" data-timer="false"></div></div>
@@ -248,9 +273,9 @@
             group: 'shared', 
             animation: 150, 
             handle: '.drag-handle',
-            forceFallback: true,     // ★ラグと位置ズレを防ぐため、カスタムドラッグのみ使用
+            forceFallback: true,     
             fallbackTolerance: 5,
-            emptyInsertThreshold: 100, // ★重要：空のエリアに落としやすくする感度を大幅アップ
+            emptyInsertThreshold: 100, 
             onEnd: handleDragEnd
         });
     });
