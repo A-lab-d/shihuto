@@ -53,30 +53,26 @@
         .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; flex-shrink: 0; }
         .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
-        /* ★エリア内のカードをGridで多列化（横長を解消） */
         .list-group { 
             flex-grow: 1; padding: 4px; 
             display: grid; gap: 8px; 
-            align-content: start; /* 上に詰めて配置 */
+            align-content: start; 
         }
-        /* 左側エリアはご要望通り「4列」固定 */
         #working, #waiting, #break { grid-template-columns: repeat(4, 1fr); }
-        /* 右側エリアはスペースの都合上「2列」に設定 */
         #reception, #klas, #housing, #briefing { grid-template-columns: repeat(2, 1fr); }
         
-        /* ★カードのデザインを「コンパクト＆厚みあり」に変更 */
         .staff-card {
             border: 1px solid #777; border-radius: 8px; margin: 0;
             display: flex; align-items: stretch; cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; 
             width: 100%; overflow: hidden;
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
+            transition: transform 0.1s ease; /* タッチ時の反応を滑らかに */
         }
         
-        /* ★ドラッグ専用グリップを超巨大化（背景色をつけて分かりやすく） */
         .drag-handle {
-            width: 44px; /* Apple推奨の押しやすい最小幅 */
-            background: rgba(0,0,0,0.08); /* グリップ部分だけ少し暗くする */
+            width: 44px; 
+            background: rgba(0,0,0,0.08); 
             color: #555; font-size: 24px;
             display: flex; align-items: center; justify-content: center;
             border-right: 1px solid #ccc;
@@ -84,15 +80,14 @@
             touch-action: none; 
         }
         
-        /* 情報表示エリア */
         .card-content {
             padding: 6px 8px;
             display: flex; flex-direction: column; justify-content: center; gap: 4px;
             flex-grow: 1; pointer-events: none; overflow: hidden;
         }
         
-        .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.95rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; pointer-events: none; }
+        .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.95rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; }
         .no-timer .timer-display { display: none; }
         
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
@@ -104,7 +99,20 @@
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-        /* モーダル */
+        /* ★ドラッグ中（持ち上げている最中）のカードの見た目 */
+        .sortable-drag {
+            opacity: 0.9 !important;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important;
+            transform: scale(1.05); /* 持ち上げている感を出す */
+            z-index: 9999;
+        }
+        /* ★ドラッグ元の抜け殻（ドロップ先のガイド）の見た目 */
+        .sortable-ghost {
+            opacity: 0.3;
+            background-color: #e0e0e0 !important;
+            border: 2px dashed #999;
+        }
+
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 450px; }
         .modal-item { margin-bottom: 15px; display: flex; flex-direction: column; }
@@ -211,7 +219,6 @@
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
                 
-                // ★構造変更: 左に巨大グリップ、右にテキスト情報
                 card.innerHTML = `
                     <div class="drag-handle">≡</div>
                     <div class="card-content">
@@ -221,7 +228,6 @@
                 `;
                 
                 card.onclick = (e) => {
-                    // グリップ部分を触った時は詳細を開かない
                     if (e.target.closest('.drag-handle')) return;
                     openModal(id, localDataCache[id]);
                 };
@@ -261,12 +267,11 @@
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
-            handle: '.drag-handle', // グリップをつかんだ時だけ動く
+            handle: '.drag-handle',
             
-            // ★指に完全に追いつかせるiOS特効薬
-            forceFallback: true,    // カスタムドラッグ強制
-            fallbackOnBody: true,   // ドラッグ中の要素を最前面（Body直下）で動かす
-            fallbackTolerance: 3,
+            // ★改善：巨大化・ズレ・ワープの原因だった fallbackOnBody を削除
+            forceFallback: true,     // カスタムドラッグは維持（スムーズな動きのため）
+            fallbackTolerance: 5,    // 多少のブレは許容
             
             onEnd: handleDragEnd
         });
