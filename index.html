@@ -36,44 +36,44 @@
         .registration-form input[type="text"] { flex-grow: 1; min-width: 150px; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 18px; cursor: pointer; }
 
-        .zoom-control {
-            display: flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 8px;
-            color: white; font-size: 0.9rem; font-weight: bold;
-        }
-        .zoom-control input[type="range"] { width: 100px; }
-
-        .board-container { flex-grow: 1; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
+        /* 左側を広くし、全体を横長に使いやすくする設定 */
+        .board-container { flex-grow: 1; display: grid; grid-template-columns: 2.5fr 1fr; gap: 10px; }
         .left-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 10px; }
-        .right-grid { display: grid; grid-template-rows: auto auto auto auto; gap: 10px; }
+        .right-grid { display: grid; grid-template-rows: repeat(4, auto); gap: 10px; }
         
-        .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 180px; }
-        #working-col { grid-column: 1 / span 2; min-height: 250px; }
+        /* ★ドロップエリアを広げるための設定（height: 100% で枠全体をカバー） */
+        .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 150px; height: 100%; }
+        #working-col { grid-column: 1 / span 2; min-height: 200px; }
         
         .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; flex-shrink: 0; }
         .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
+        /* ★移動先として認識される受け皿を最大化（flex-grow: 1） */
         .list-group { 
-            flex-grow: 1; padding: 4px; 
-            display: grid; gap: 8px; 
+            flex-grow: 1; 
+            padding: 4px; 
+            display: grid; 
+            gap: 8px; 
             align-content: start; 
+            min-height: 100px; /* 空でも確実にドロップできるようにする */
         }
-        #working, #waiting, #break { grid-template-columns: repeat(4, 1fr); }
-        #reception, #klas, #housing, #briefing { grid-template-columns: repeat(2, 1fr); }
+        
+        /* ★カードを「なるべく画面に収まる横長」に自動調整 */
+        #working, #waiting, #break { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        #reception, #klas, #housing, #briefing { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
         
         .staff-card {
             border: 1px solid #777; border-radius: 8px; margin: 0;
             display: flex; align-items: stretch; cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); background: white; 
-            width: 100%; overflow: hidden;
+            width: 100%; height: 50px; overflow: hidden;
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
-            transition: transform 0.1s ease; /* タッチ時の反応を滑らかに */
         }
         
         .drag-handle {
-            width: 44px; 
+            width: 40px; 
             background: rgba(0,0,0,0.08); 
-            color: #555; font-size: 24px;
+            color: #555; font-size: 22px;
             display: flex; align-items: center; justify-content: center;
             border-right: 1px solid #ccc;
             cursor: grab; flex-shrink: 0;
@@ -81,13 +81,13 @@
         }
         
         .card-content {
-            padding: 6px 8px;
-            display: flex; flex-direction: column; justify-content: center; gap: 4px;
+            padding: 4px 8px;
+            display: flex; flex-direction: column; justify-content: center; gap: 2px;
             flex-grow: 1; pointer-events: none; overflow: hidden;
         }
         
         .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.95rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; }
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.9rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; }
         .no-timer .timer-display { display: none; }
         
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
@@ -99,14 +99,11 @@
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-        /* ★ドラッグ中（持ち上げている最中）のカードの見た目 */
         .sortable-drag {
             opacity: 0.9 !important;
             box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important;
-            transform: scale(1.05); /* 持ち上げている感を出す */
             z-index: 9999;
         }
-        /* ★ドラッグ元の抜け殻（ドロップ先のガイド）の見た目 */
         .sortable-ghost {
             opacity: 0.3;
             background-color: #e0e0e0 !important;
@@ -129,11 +126,7 @@
 <div class="registration-form">
     <input type="text" id="inputName" placeholder="氏名を追加" autocomplete="off">
     <button type="button" class="add-btn" id="addBtn">追加</button>
-    <div class="zoom-control">
-        <label for="zoomSlider">サイズ調整:</label>
-        <input type="range" id="zoomSlider" min="0.6" max="1.5" step="0.05" value="1">
     </div>
-</div>
 
 <div class="board-container" id="boardArea">
     <div class="left-grid">
@@ -174,19 +167,6 @@
 </div>
 
 <script>
-    const zoomSlider = document.getElementById('zoomSlider');
-    const boardArea = document.getElementById('boardArea');
-    const savedZoom = localStorage.getItem('boardZoom');
-    if(savedZoom) {
-        zoomSlider.value = savedZoom;
-        boardArea.style.zoom = savedZoom;
-    }
-    zoomSlider.addEventListener('input', (e) => {
-        const val = e.target.value;
-        boardArea.style.zoom = val;
-        localStorage.setItem('boardZoom', val);
-    });
-
     const firebaseConfig = {
         apiKey: "AIzaSyCQl7uzYOTnsNP7qoHHKzOki2xucHp23kU",
         authDomain: "shihuto-31834.firebaseapp.com",
@@ -268,11 +248,9 @@
             group: 'shared', 
             animation: 150, 
             handle: '.drag-handle',
-            
-            // ★改善：巨大化・ズレ・ワープの原因だった fallbackOnBody を削除
-            forceFallback: true,     // カスタムドラッグは維持（スムーズな動きのため）
-            fallbackTolerance: 5,    // 多少のブレは許容
-            
+            forceFallback: true,     // ★ラグと位置ズレを防ぐため、カスタムドラッグのみ使用
+            fallbackTolerance: 5,
+            emptyInsertThreshold: 100, // ★重要：空のエリアに落としやすくする感度を大幅アップ
             onEnd: handleDragEnd
         });
     });
