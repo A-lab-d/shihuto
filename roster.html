@@ -38,36 +38,49 @@
         
         .list-group { flex-grow: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; min-height: 80px; }
         
+        /* ★名簿用カードデザイン（2色対応） */
         .staff-card {
+            --card-bg: #ffffff;
+            background: var(--card-bg);
             border: 1px solid #ccc; border-radius: 8px; padding: 12px;
             display: flex; flex-direction: column; gap: 4px; cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05); background: white; user-select: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;
             transition: transform 0.1s;
         }
-        .staff-card[data-grade="1年"] { background-color: var(--color-1); }
-        .staff-card[data-grade="2年"] { background-color: var(--color-2); }
-        .staff-card[data-grade="3年"] { background-color: var(--color-3); }
-        .staff-card[data-grade="4年"] { background-color: var(--color-4); }
-        .staff-card[data-grade="修士以上"] { background-color: var(--color-m); }
+        .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
+        .staff-card[data-grade="2年"] { --card-bg: var(--color-2); }
+        .staff-card[data-grade="3年"] { --card-bg: var(--color-3); }
+        .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
+        .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
+
+        /* 右半分オレンジ */
+        .staff-card[data-presenter="可"] {
+            background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%);
+        }
         
         .staff-name { font-weight: bold; font-size: 1.15rem; pointer-events: none; }
         .staff-badges { display: flex; gap: 5px; pointer-events: none; flex-wrap: wrap; }
         .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .badge-role { background: rgba(0,0,0,0.1); color: #333; }
-        .badge-presenter { background: #f39c12; color: white; }
-        .staff-memo { font-size: 0.85rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; margin-top: 4px; }
+        .badge-presenter { background: #f39c12; color: white; border: 1px solid #fff; } /* 境界線が見やすいように少し加工 */
+        .staff-memo { font-size: 0.85rem; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; margin-top: 4px; background: rgba(255,255,255,0.6); padding: 0 4px; border-radius: 4px; }
         
-        .sortable-ghost { opacity: 0.4; background-color: #f0f0f0; border: 2px dashed #999; }
+        .sortable-ghost { opacity: 0.4; background-color: #f0f0f0 !important; border: 2px dashed #999; }
 
+        /* モーダル */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
         .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
         .modal-item label { font-size: 0.95rem; color: #666; margin-bottom: 4px; font-weight: bold; }
         .modal-item input, .modal-item select, .modal-item textarea { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; }
-        .btn-save { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 16px; }
-        .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px; }
-        .btn-close { background: #999; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px; }
+        
+        /* ボタン配置エリア */
+        .modal-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+        .btn-save { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .btn-close { background: #999; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .btn-present { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .btn-absent { background: #e67e22; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -140,9 +153,17 @@
         </div>
         <div class="modal-item"><label>学科</label><input type="text" id="editDept"></div>
         <div class="modal-item"><label>メモ</label><textarea id="editMemo" rows="2"></textarea></div>
+        
         <div class="modal-actions">
             <button class="btn-delete" onclick="deleteStaff()">削除</button>
-            <div><button class="btn-close" onclick="closeModal()">キャンセル</button><button class="btn-save" onclick="saveStaff()">保存</button></div>
+            <div style="display: flex; gap: 10px; margin: 0 auto;">
+                <button class="btn-present" onclick="setStatus('present')">出勤</button>
+                <button class="btn-absent" onclick="setStatus('absent')">未出勤</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-close" onclick="closeModal()">キャンセル</button>
+                <button class="btn-save" onclick="saveStaff()">保存</button>
+            </div>
         </div>
     </div>
 </div>
@@ -163,7 +184,6 @@
     let localDataCache = {};
     let currentEditId = null;
 
-    // ★学年の優先順位（小さいほど上に表示）
     const gradeOrder = { "": 0, "修士以上": 1, "4年": 2, "3年": 3, "2年": 4, "1年": 5 };
 
     db.on('value', (snapshot) => {
@@ -186,6 +206,10 @@
             card.className = 'staff-card';
             card.setAttribute('data-id', id);
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
+            
+            // ★右半分オレンジにするための属性追加
+            if(staff.presenter === '可') card.setAttribute('data-presenter', '可');
+            else card.removeAttribute('data-presenter');
             
             const roleBadge = staff.role ? `<span class="badge badge-role">${staff.role}</span>` : '';
             const presenterBadge = staff.presenter === '可' ? `<span class="badge badge-presenter">発表 可</span>` : '';
@@ -212,11 +236,9 @@
         document.getElementById('count-klas').innerText = cKlas;
         document.getElementById('count-presenter').innerText = cPresenter;
 
-        // ★名簿画面の全エリアを自動ソート
         autoSortAll();
     });
 
-    // ★自動ソート関数
     function autoSortAll() {
         if (document.querySelector('.sortable-drag') || document.querySelector('.sortable-ghost')) return;
         
@@ -247,6 +269,7 @@
             group: 'role-group-' + listRole, 
             animation: 150, 
             fallbackTolerance: 5,
+            forceFallback: true,
             
             onEnd: (evt) => {
                 if (evt.from === evt.to) return;
@@ -298,6 +321,35 @@
         closeModal();
     }
     
+    // ★出勤・未出勤ボタンから直接ステータスを切り替える（編集内容も保存する）
+    function setStatus(status) {
+        const role = document.getElementById('editRole').value;
+        let updateData = {
+            name: document.getElementById('editName').value,
+            grade: document.getElementById('editGrade').value,
+            dept: document.getElementById('editDept').value,
+            memo: document.getElementById('editMemo').value,
+            role: role,
+            presenter: document.getElementById('editPresenter').value
+        };
+
+        if (status === 'present') {
+            let initialPos = 'waiting'; 
+            if (role === '住まい') initialPos = 'housing';
+            else if (role === 'KLAS') initialPos = 'klas';
+            else if (role === 'その他' || role === '') initialPos = 'briefing'; 
+            
+            updateData.position = initialPos;
+            updateData.startTime = Date.now();
+        } else {
+            updateData.position = 'absent';
+            updateData.startTime = null;
+        }
+
+        db.child(currentEditId).update(updateData);
+        closeModal();
+    }
+
     function deleteStaff() {
         if(confirm("このスタッフを完全に削除しますか？\n※ホワイトボードからも消えます")) {
             db.child(currentEditId).remove();
