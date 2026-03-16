@@ -163,6 +163,9 @@
     let localDataCache = {};
     let currentEditId = null;
 
+    // ★学年の優先順位（小さいほど上に表示）
+    const gradeOrder = { "": 0, "修士以上": 1, "4年": 2, "3年": 3, "2年": 4, "1年": 5 };
+
     db.on('value', (snapshot) => {
         localDataCache = snapshot.val() || {};
         document.querySelectorAll('.staff-card').forEach(card => card.remove());
@@ -208,7 +211,25 @@
         document.getElementById('count-housing').innerText = cHousing;
         document.getElementById('count-klas').innerText = cKlas;
         document.getElementById('count-presenter').innerText = cPresenter;
+
+        // ★名簿画面の全エリアを自動ソート
+        autoSortAll();
     });
+
+    // ★自動ソート関数
+    function autoSortAll() {
+        if (document.querySelector('.sortable-drag') || document.querySelector('.sortable-ghost')) return;
+        
+        document.querySelectorAll('.list-group').forEach(col => {
+            const cards = Array.from(col.querySelectorAll('.staff-card'));
+            cards.sort((a, b) => {
+                const gA = a.getAttribute('data-grade') || "";
+                const gB = b.getAttribute('data-grade') || "";
+                return (gradeOrder[gA] ?? 99) - (gradeOrder[gB] ?? 99);
+            });
+            cards.forEach(card => col.appendChild(card));
+        });
+    }
 
     document.getElementById('addBtn').onclick = () => {
         const nameInput = document.getElementById('inputName');
@@ -219,18 +240,15 @@
         nameInput.value = '';
     };
 
-    // ★重要：役職による移動制限と、初期配置の自動振り分け設定
     document.querySelectorAll('.list-group').forEach(el => {
-        const listRole = el.getAttribute('data-role'); // このリストが持つ役職
+        const listRole = el.getAttribute('data-role');
         
         new Sortable(el, {
-            // グループ名を「役職名」に設定することで、同じ役職のリスト間でのみ移動可能にする
             group: 'role-group-' + listRole, 
             animation: 150, 
             fallbackTolerance: 5,
             
             onEnd: (evt) => {
-                // 同じ場所での並び替え等で移動しなかった場合は無視
                 if (evt.from === evt.to) return;
 
                 const id = evt.item.getAttribute('data-id');
@@ -240,25 +258,16 @@
                 let updateData = {};
                 
                 if (toStatus === 'present') {
-                    // ★出勤になった場合のホワイトボード初期位置マッピング
-                    let initialPos = 'waiting'; // デフォルト(フリー)は「空き」
+                    let initialPos = 'waiting'; 
                     if (toRole === '住まい') initialPos = 'housing';
                     else if (toRole === 'KLAS') initialPos = 'klas';
-                    else if (toRole === 'その他') initialPos = 'briefing'; // その他は「説明会」
+                    else if (toRole === 'その他') initialPos = 'briefing'; 
                     
-                    updateData = { 
-                        position: initialPos, 
-                        startTime: Date.now() 
-                    };
+                    updateData = { position: initialPos, startTime: Date.now() };
                 } else {
-                    // ★未出勤になった場合は一律で absent に
-                    updateData = { 
-                        position: 'absent', 
-                        startTime: null 
-                    };
+                    updateData = { position: 'absent', startTime: null };
                 }
                 
-                // データベースを更新
                 db.child(id).update(updateData);
             }
         });
