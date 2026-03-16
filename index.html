@@ -45,7 +45,7 @@
             border: 1px solid #777; border-radius: 8px; margin: 0; display: flex; align-items: stretch; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); width: 100%; height: 50px; overflow: hidden; 
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease;
-            cursor: default; /* クリック不可であることを示す */
+            cursor: default; 
         }
         
         .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
@@ -53,7 +53,6 @@
         .staff-card[data-grade="3年"] { --card-bg: var(--color-3); }
         .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
-
         .staff-card[data-presenter="可"] { background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%); }
         
         .drag-handle { width: 40px; background: rgba(0,0,0,0.08); color: #555; font-size: 22px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
@@ -132,7 +131,6 @@
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
                 card.innerHTML = `<div class="drag-handle">≡</div><div class="card-content"><div class="staff-name"></div><div class="timer-display">00:00</div></div>`;
-                // ★ onclick イベント（モーダルを開く処理）を削除し、編集不可にしました
             }
             
             const deptText = staff.dept ? `(${staff.dept})` : '';
@@ -169,10 +167,54 @@
         });
     }
 
+    // ★重要：ドラッグ移動時の自動保存＆自動開始ロジック
     const handleDragEnd = (evt) => {
         const id = evt.item.getAttribute('data-id');
-        const newPos = evt.to.id;
-        db.child(id).update({ position: newPos, startTime: Date.now() });
+        const fromPos = evt.from.id;
+        const toPos = evt.to.id;
+        
+        // 同じ場所での移動（並び替え）なら何もしない
+        if (fromPos === toPos) return;
+
+        let updateData = { position: toPos, startTime: Date.now() };
+
+        // ★① 「対応(working)」に配置された時
+        if (toPos === 'working') {
+            updateData.working_phase = '物件選定中'; // 自動でフェーズをセット
+            updateData.phase_start_time = Date.now();
+            updateData.lap_times = null; // 以前のラップタイムを念のためリセット
+        }
+
+        // ★② 「対応(working)」から別の場所へ移動した時（対応完了）
+        if (fromPos === 'working' && toPos !== 'working') {
+            const staff = localDataCache[id];
+            if (staff) {
+                const now = Date.now();
+                
+                // 最終ラップタイムの計算
+                let finalLaps = staff.lap_times ? { ...staff.lap_times } : {};
+                if (staff.working_phase && staff.phase_start_time) {
+                    const elapsed = Math.floor((now - staff.phase_start_time) / 1000);
+                    finalLaps[staff.working_phase] = (finalLaps[staff.working_phase] || 0) + elapsed;
+                }
+                const totalTime = staff.startTime ? Math.floor((now - staff.startTime) / 1000) : 0;
+
+                // 履歴データベース（lap_history）に保存
+                firebase.database().ref(`lap_history/${id}`).push({
+                    timestamp: now,
+                    date: new Date(now).toLocaleString('ja-JP'),
+                    total_seconds: totalTime,
+                    laps_seconds: finalLaps
+                });
+
+                // 現在のカードのラップ情報をリセット
+                updateData.working_phase = null;
+                updateData.phase_start_time = null;
+                updateData.lap_times = null;
+            }
+        }
+
+        db.child(id).update(updateData);
     };
 
     document.querySelectorAll('.list-group').forEach(el => {
