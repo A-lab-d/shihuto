@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>シフト管理 - 対応中ラップタイム</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f4f6f9; --accent: #2c3e50; 
+            --color-1: #ffadad; --color-2: #a0c4ff; --color-3: #fdffb6; --color-4: #caffbf; --color-m: #d1d1d1;
+        }
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding: 20px; min-height: 100vh; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 1.5rem; color: var(--accent); }
+        .back-btn { background: #7f8c8d; color: white; border: none; border-radius: 8px; padding: 10px 20px; font-weight: bold; cursor: pointer; }
+
+        /* カードを大きく・敷き詰める */
+        .list-group { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 20px; 
+        }
+        
+        .staff-card {
+            --card-bg: #ffffff;
+            background: var(--card-bg);
+            border: 1px solid #ccc; border-radius: 12px; padding: 15px;
+            display: flex; flex-direction: column; cursor: pointer; position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); user-select: none;
+        }
+        .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
+        .staff-card[data-grade="2年"] { --card-bg: var(--color-2); }
+        .staff-card[data-grade="3年"] { --card-bg: var(--color-3); }
+        .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
+        .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
+        .staff-card[data-presenter="可"] { background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%); }
+        
+        /* 状態（フェーズ）のバッジ表示 */
+        .phase-badge {
+            position: absolute; top: 15px; right: 15px;
+            background: #34495e; color: white; padding: 5px 10px; border-radius: 6px; 
+            font-size: 0.9rem; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .staff-name { font-weight: bold; font-size: 1.3rem; margin-bottom: 5px; padding-right: 80px; }
+        
+        /* ラップタイム表示グリッド */
+        .lap-times {
+            margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            font-size: 0.9rem; color: #444; background: rgba(255,255,255,0.75); 
+            padding: 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1);
+        }
+        .lap-item { display: flex; justify-content: space-between; }
+        .lap-item.active { color: #e74c3c; font-weight: bold; } /* 進行中のフェーズは赤字で強調 */
+        
+        .total-time { grid-column: 1 / 3; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 4px; font-weight: bold; font-size: 1rem; display: flex; justify-content: space-between; }
+
+        /* 状態変更モーダル */
+        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; }
+        .modal-content h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .phase-buttons { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+        .phase-btn { padding: 15px; font-size: 1.2rem; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+        .btn-select { background: #3498db; }
+        .btn-taxi { background: #f39c12; }
+        .btn-view { background: #e74c3c; }
+        .btn-return { background: #2ecc71; }
+        
+        .reset-btn { background: #95a5a6; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; margin-top: 15px; cursor: pointer; width: 100%; }
+        .cancel-btn { background: #ecf0f1; color: #333; border: 1px solid #ccc; padding: 12px 20px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>⏱ 対応中ラップタイム</h1>
+    <button class="back-btn" onclick="window.close()">閉じる</button>
+</div>
+
+<div id="working-list" class="list-group">
+    </div>
+
+<div id="modalOverlay" onclick="if(event.target==this) closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>状態変更: <span id="modalStaffName"></span></h3>
+        <div class="phase-buttons">
+            <button class="phase-btn btn-select" onclick="setPhase('物件選定中')">物件選定中</button>
+            <button class="phase-btn btn-taxi" onclick="setPhase('タクシー待ち')">タクシー待ち</button>
+            <button class="phase-btn btn-view" onclick="setPhase('内見中')">内見中</button>
+            <button class="phase-btn btn-return" onclick="setPhase('内見帰宅後')">内見帰宅後</button>
+        </div>
+        <button class="reset-btn" onclick="resetPhase()">ラップタイムをリセット</button>
+        <button class="cancel-btn" onclick="closeModal()">キャンセル</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCQl7uzYOTnsNP7qoHHKzOki2xucHp23kU",
+        authDomain: "shihuto-31834.firebaseapp.com",
+        databaseURL: "https://shihuto-31834-default-rtdb.firebaseio.com/", 
+        projectId: "shihuto-31834",
+        storageBucket: "shihuto-31834.firebasestorage.app",
+        messagingSenderId: "147810720189",
+        appId: "1:147810720189:web:89ce7c02637a7b5f65dad4"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('staff_data');
+    let localDataCache = {};
+    let currentEditId = null;
+
+    db.on('value', (snapshot) => {
+        localDataCache = snapshot.val() || {};
+        const container = document.getElementById('working-list');
+        
+        // 消えたカードの削除
+        document.querySelectorAll('.staff-card').forEach(card => {
+            const id = card.getAttribute('data-id');
+            if (!localDataCache[id] || localDataCache[id].position !== 'working') {
+                card.remove();
+            }
+        });
+
+        // カードの生成・更新
+        Object.keys(localDataCache).forEach(id => {
+            const staff = localDataCache[id];
+            
+            // ★対応(working)以外の人はこの画面に表示しない
+            if (staff.position !== 'working') return;
+
+            let card = document.querySelector(`.staff-card[data-id="${id}"]`);
+            
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'staff-card';
+                card.setAttribute('data-id', id);
+                
+                // カードの枠組み（ラップタイム表示エリア込み）
+                card.innerHTML = `
+                    <div class="staff-name"></div>
+                    <div class="phase-badge">未設定</div>
+                    <div class="lap-times">
+                        <div class="lap-item"><span class="lap-label">物件選定中</span><span class="lap-物件選定中">00:00</span></div>
+                        <div class="lap-item"><span class="lap-label">タクシー待ち</span><span class="lap-タクシー待ち">00:00</span></div>
+                        <div class="lap-item"><span class="lap-label">内見中</span><span class="lap-内見中">00:00</span></div>
+                        <div class="lap-item"><span class="lap-label">内見帰宅後</span><span class="lap-内見帰宅後">00:00</span></div>
+                        <div class="total-time"><span>対応トータル</span><span class="timer-display">00:00</span></div>
+                    </div>
+                `;
+                
+                card.onclick = () => openPhaseModal(id, staff);
+                container.appendChild(card);
+            }
+            
+            const deptText = staff.dept ? `(${staff.dept})` : '';
+            card.querySelector('.staff-name').innerText = `${staff.name}${deptText}`;
+            card.querySelector('.phase-badge').innerText = staff.working_phase || '未設定';
+            
+            if(staff.grade) card.setAttribute('data-grade', staff.grade);
+            else card.removeAttribute('data-grade');
+            
+            if(staff.presenter === '可') card.setAttribute('data-presenter', '可');
+            else card.removeAttribute('data-presenter');
+        });
+
+        updateTimers();
+    });
+
+    // 秒数を mm:ss 形式に変換
+    function formatTime(totalSeconds) {
+        if (!totalSeconds || totalSeconds < 0) return "00:00";
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateTimers() {
+        const now = Date.now();
+        document.querySelectorAll('.staff-card').forEach(card => {
+            const id = card.getAttribute('data-id');
+            const staff = localDataCache[id];
+            if (!staff) return;
+
+            // トータル時間の計算
+            const start = staff.startTime || now;
+            const totalElapsed = Math.floor((now - start) / 1000);
+            card.querySelector('.timer-display').innerText = formatTime(totalElapsed);
+
+            // 各フェーズのラップタイム計算
+            const phases = ['物件選定中', 'タクシー待ち', '内見中', '内見帰宅後'];
+            phases.forEach(phase => {
+                let sec = (staff.lap_times && staff.lap_times[phase]) || 0;
+                const isCurrentPhase = (staff.working_phase === phase);
+                
+                // 現在進行中のフェーズなら、経過時間を足し合わせる
+                if (isCurrentPhase && staff.phase_start_time) {
+                    sec += Math.floor((now - staff.phase_start_time) / 1000);
+                }
+                
+                const lapEl = card.querySelector(`.lap-${phase}`);
+                if (lapEl) {
+                    lapEl.innerText = formatTime(sec);
+                    // 進行中のものは赤文字にして強調
+                    if (isCurrentPhase) lapEl.parentElement.classList.add('active');
+                    else lapEl.parentElement.classList.remove('active');
+                }
+            });
+        });
+    }
+
+    // 1秒ごとに画面のタイマーを書き換え
+    setInterval(updateTimers, 1000);
+
+    // モーダルの制御
+    function openPhaseModal(id, staff) {
+        currentEditId = id;
+        const deptText = staff.dept ? `(${staff.dept})` : '';
+        document.getElementById('modalStaffName').innerText = `${staff.name}${deptText}`;
+        document.getElementById('modalOverlay').style.display = 'flex';
+    }
+    
+    function closeModal() { 
+        document.getElementById('modalOverlay').style.display = 'none'; 
+    }
+
+    // フェーズの変更とラップタイムの記録
+    function setPhase(newPhase) {
+        const staff = localDataCache[currentEditId];
+        const now = Date.now();
+        let updates = { 
+            working_phase: newPhase, 
+            phase_start_time: now 
+        };
+        
+        // 前のフェーズが存在し、かつ違うフェーズに切り替える場合、ラップタイムを保存
+        if (staff.working_phase && staff.working_phase !== newPhase && staff.phase_start_time) {
+            const elapsed = Math.floor((now - staff.phase_start_time) / 1000);
+            const currentLap = (staff.lap_times && staff.lap_times[staff.working_phase]) || 0;
+            updates[`lap_times/${staff.working_phase}`] = currentLap + elapsed;
+        }
+        
+        db.child(currentEditId).update(updates);
+        closeModal();
+    }
+
+    // リセット処理
+    function resetPhase() {
+        if(confirm("進行状況とラップタイムをリセットしますか？\n(全体の対応時間はリセットされません)")) {
+            db.child(currentEditId).update({
+                working_phase: null,
+                phase_start_time: null,
+                lap_times: null
+            });
+            closeModal();
+        }
+    }
+</script>
+</body>
+</html>

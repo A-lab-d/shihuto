@@ -44,7 +44,8 @@
             background: var(--card-bg);
             border: 1px solid #777; border-radius: 8px; margin: 0; display: flex; align-items: stretch; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.15); width: 100%; height: 50px; overflow: hidden; 
-            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease; cursor: pointer;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease;
+            cursor: default; /* クリック不可であることを示す */
         }
         
         .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
@@ -53,9 +54,7 @@
         .staff-card[data-grade="4年"] { --card-bg: var(--color-4); }
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
 
-        .staff-card[data-presenter="可"] {
-            background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%);
-        }
+        .staff-card[data-presenter="可"] { background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%); }
         
         .drag-handle { width: 40px; background: rgba(0,0,0,0.08); color: #555; font-size: 22px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
         .card-content { padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-grow: 1; pointer-events: none; overflow: hidden; }
@@ -69,20 +68,7 @@
         .sortable-drag { opacity: 0.9 !important; box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important; transform: scale(1.05); z-index: 9999; }
         .sortable-ghost { opacity: 0.3; background-color: #e0e0e0 !important; border: 2px dashed #999; }
 
-        .roster-btn { background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; padding: 15px; width: 100%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
-        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
-        .modal-item { margin-bottom: 12px; display: flex; flex-direction: column; }
-        .modal-item label { font-size: 0.95rem; color: #666; margin-bottom: 4px; font-weight: bold; }
-        .modal-item input, .modal-item select, .modal-item textarea { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .modal-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
-        .btn-save { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
-        .btn-delete { background: var(--danger); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .btn-close { background: #999; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        
-        .btn-present { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
-        .btn-absent { background: #e67e22; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .roster-btn { color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; padding: 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); flex: 1; text-align: center; }
     </style>
 </head>
 <body>
@@ -95,48 +81,14 @@
         <div class="column" id="break-col"><div class="column-header"><h2 class="column-title">休み</h2></div><div id="break" class="list-group" data-timer="true" data-limit="45"></div></div>
     </div>
     <div class="right-grid">
-        <button class="roster-btn" onclick="window.open('roster.html', '_blank')">📋 名簿一覧</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="roster-btn" style="background: var(--accent);" onclick="window.open('roster.html', '_blank')">📋 名簿一覧</button>
+            <button class="roster-btn" style="background: #e67e22;" onclick="window.open('working_only.html', '_blank')">⏱ 対応のみ表示</button>
+        </div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">受付</h2></div><div id="reception" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">KLAS</h2></div><div id="klas" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">住まい</h2></div><div id="housing" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">説明会</h2></div><div id="briefing" class="list-group" data-timer="false"></div></div>
-    </div>
-</div>
-
-<div id="modalOverlay" onclick="if(event.target==this) closeModal()">
-    <div class="modal-content" onclick="event.stopPropagation()">
-        <h3 style="margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 10px;">スタッフ情報編集</h3>
-        <div class="modal-item"><label>氏名</label><input type="text" id="editName"></div>
-        <div style="display: flex; gap: 10px;">
-            <div class="modal-item" style="flex: 1;"><label>役職</label><select id="editRole"><option value="">その他 (未設定)</option><option value="フリー">フリー</option><option value="住まい">住まい</option><option value="KLAS">KLAS</option></select></div>
-            <div class="modal-item" style="flex: 1;"><label>説明会発表者</label><select id="editPresenter"><option value="">未設定</option><option value="可">可</option><option value="不可">不可</option></select></div>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <div class="modal-item" style="flex: 1;"><label>学年</label><select id="editGrade"><option value="">未設定</option><option value="1年">1年 (赤)</option><option value="2年">2年 (青)</option><option value="3年">3年 (黄)</option><option value="4年">4年 (緑)</option><option value="修士以上">修士以上 (灰)</option></select></div>
-            <div class="modal-item" style="flex: 1;">
-                <label>学科</label>
-                <select id="editDept">
-                    <option value="">未設定</option>
-                    <option value="地域">地域</option><option value="教育">教育</option><option value="医医">医医</option><option value="医看">医看</option>
-                    <option value="獣医">獣医</option><option value="動植物">動植物</option><option value="森林">森林</option><option value="海洋">海洋</option>
-                    <option value="農生命">農生命</option><option value="機械">機械</option><option value="土木">土木</option><option value="工生命">工生命</option>
-                    <option value="半導体">半導体</option><option value="電気">電気</option><option value="情報">情報</option><option value="職員">職員</option><option value="その他">その他</option>
-                </select>
-            </div>
-        </div>
-        <div class="modal-item"><label>メモ</label><textarea id="editMemo" rows="2"></textarea></div>
-        
-        <div class="modal-actions">
-            <button class="btn-delete" onclick="deleteStaff()">削除</button>
-            <div style="display: flex; gap: 10px; margin: 0 auto;">
-                <button class="btn-present" onclick="setStatus('present')">出勤</button>
-                <button class="btn-absent" onclick="setStatus('absent')">未出勤</button>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-close" onclick="closeModal()">キャンセル</button>
-                <button class="btn-save" onclick="saveStaff()">保存</button>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -154,7 +106,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('staff_data');
     let localDataCache = {};
-    let currentEditId = null;
 
     const gradeOrder = { "": 0, "修士以上": 1, "4年": 2, "3年": 3, "2年": 4, "1年": 5 };
 
@@ -181,14 +132,9 @@
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
                 card.innerHTML = `<div class="drag-handle">≡</div><div class="card-content"><div class="staff-name"></div><div class="timer-display">00:00</div></div>`;
-                
-                card.onclick = (e) => {
-                    if (e.target.closest('.drag-handle')) return;
-                    openModal(id, localDataCache[id]);
-                };
+                // ★ onclick イベント（モーダルを開く処理）を削除し、編集不可にしました
             }
             
-            // ★名前と学科を結合して表示
             const deptText = staff.dept ? `(${staff.dept})` : '';
             card.querySelector('.staff-name').innerText = `${staff.name}${deptText}`;
             
@@ -232,65 +178,6 @@
     document.querySelectorAll('.list-group').forEach(el => {
         new Sortable(el, { group: 'shared', animation: 150, handle: '.drag-handle', forceFallback: true, fallbackTolerance: 5, emptyInsertThreshold: 100, onEnd: handleDragEnd });
     });
-
-    function openModal(id, staff) {
-        currentEditId = id;
-        document.getElementById('editName').value = staff.name || '';
-        document.getElementById('editGrade').value = staff.grade || '';
-        document.getElementById('editDept').value = staff.dept || '';
-        document.getElementById('editMemo').value = staff.memo || '';
-        document.getElementById('editRole').value = staff.role || '';
-        document.getElementById('editPresenter').value = staff.presenter || '';
-        document.getElementById('modalOverlay').style.display = 'flex';
-    }
-    function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; }
-    
-    function saveStaff() {
-        db.child(currentEditId).update({
-            name: document.getElementById('editName').value,
-            grade: document.getElementById('editGrade').value,
-            dept: document.getElementById('editDept').value,
-            memo: document.getElementById('editMemo').value,
-            role: document.getElementById('editRole').value,
-            presenter: document.getElementById('editPresenter').value
-        });
-        closeModal();
-    }
-
-    function setStatus(status) {
-        const role = document.getElementById('editRole').value;
-        let updateData = {
-            name: document.getElementById('editName').value,
-            grade: document.getElementById('editGrade').value,
-            dept: document.getElementById('editDept').value,
-            memo: document.getElementById('editMemo').value,
-            role: role,
-            presenter: document.getElementById('editPresenter').value
-        };
-
-        if (status === 'present') {
-            let initialPos = 'waiting'; 
-            if (role === '住まい') initialPos = 'housing';
-            else if (role === 'KLAS') initialPos = 'klas';
-            else if (role === 'その他' || role === '') initialPos = 'briefing'; 
-            
-            updateData.position = initialPos;
-            updateData.startTime = Date.now();
-        } else {
-            updateData.position = 'absent';
-            updateData.startTime = null;
-        }
-
-        db.child(currentEditId).update(updateData);
-        closeModal();
-    }
-
-    function deleteStaff() {
-        if(confirm("このスタッフを完全に削除しますか？")) {
-            db.child(currentEditId).remove();
-            closeModal();
-        }
-    }
 
     function updateTimers() {
         const now = Date.now();
