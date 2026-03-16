@@ -18,7 +18,6 @@
         }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         
-        /* 画面全体のスクロールを自然にする */
         body { 
             font-family: -apple-system, sans-serif; 
             background: var(--bg-color); 
@@ -26,7 +25,7 @@
             min-height: 100vh; 
             display: flex; flex-direction: column; 
             overflow-y: auto; 
-            -webkit-overflow-scrolling: touch; /* iPadでの滑らかな慣性スクロール */
+            -webkit-overflow-scrolling: touch; 
         }
         
         .registration-form { 
@@ -44,54 +43,47 @@
         }
         .zoom-control input[type="range"] { width: 100px; }
 
-        /* エリアの高さを中身に合わせて自動で伸ばす（内部スクロール廃止） */
-        .board-container { 
-            flex-grow: 1; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; 
-        }
-        .left-grid { 
-            display: grid; grid-template-columns: 1fr 1fr; 
-            grid-template-rows: auto auto; 
-            gap: 10px; 
-        }
-        .right-grid { 
-            display: grid; 
-            grid-template-rows: auto auto auto auto; 
-            gap: 10px; 
-        }
+        .board-container { flex-grow: 1; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
+        .left-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 10px; }
+        .right-grid { display: grid; grid-template-rows: auto auto auto auto; gap: 10px; }
         
-        /* 空の時でも潰れないように最低高さを設定 */
         .column { background: #fff; border: 2px solid #333; border-radius: 6px; display: flex; flex-direction: column; padding: 6px; min-height: 180px; }
         #working-col { grid-column: 1 / span 2; min-height: 250px; }
         
         .column-header { text-align: center; border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; flex-shrink: 0; }
         .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
-        .list-group { 
-            flex-grow: 1; padding: 2px; 
-            display: flex; flex-direction: column; gap: 8px;
-        }
+        .list-group { flex-grow: 1; padding: 2px; display: flex; flex-direction: column; gap: 8px; }
         
-        /* カードのタッチ妨害を解除し、スワイプを許可 */
+        /* ★カード本体の設定（スクロールを邪魔しない） */
         .staff-card {
-            border: 1px solid #777; border-radius: 12px; padding: 16px 15px; margin: 2px 0;
-            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+            border: 1px solid #777; border-radius: 12px; padding: 12px 15px; margin: 2px 0;
+            display: flex; align-items: center; cursor: pointer;
             box-shadow: 0 3px 6px rgba(0,0,0,0.12); background: white; 
             min-height: 60px; width: 100%; 
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
-            /* touch-action: none; を削除したことでスワイプ可能に */
         }
         
-        .staff-name, .timer-display { pointer-events: none; }
+        /* ★ドラッグ専用のグリップ（持ち手） */
+        .drag-handle {
+            font-size: 28px;
+            color: #888;
+            padding: 5px 15px 5px 0; /* タッチしやすいように右側に余白を持たせる */
+            cursor: grab;
+            touch-action: none; /* グリップ部分だけはスクロールを禁止（ドラッグ優先） */
+        }
+        
+        .staff-name { font-weight: bold; font-size: 1.2rem; color: #333; pointer-events: none; }
+        
+        /* タイマーを右端に寄せる */
+        .timer-display { margin-left: auto; font-family: monospace; font-weight: bold; font-size: 1.2rem; color: #444; background: rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
+        .no-timer .timer-display { display: none; }
         
         .staff-card[data-grade="1年"] { background-color: var(--color-1); }
         .staff-card[data-grade="2年"] { background-color: var(--color-2); }
         .staff-card[data-grade="3年"] { background-color: var(--color-3); }
         .staff-card[data-grade="4年"] { background-color: var(--color-4); }
         .staff-card[data-grade="修士以上"] { background-color: var(--color-m); }
-        
-        .staff-name { font-weight: bold; font-size: 1.2rem; color: #333; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 1.2rem; color: #444; background: rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 6px; }
-        .no-timer .timer-display { display: none; }
         
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -158,7 +150,6 @@
 </div>
 
 <script>
-    // --- ズーム（表示サイズ）機能 ---
     const zoomSlider = document.getElementById('zoomSlider');
     const boardArea = document.getElementById('boardArea');
     const savedZoom = localStorage.getItem('boardZoom');
@@ -172,7 +163,6 @@
         localStorage.setItem('boardZoom', val);
     });
 
-    // --- Firebase設定 ---
     const firebaseConfig = {
         apiKey: "AIzaSyCQl7uzYOTnsNP7qoHHKzOki2xucHp23kU",
         authDomain: "shihuto-31834.firebaseapp.com",
@@ -204,8 +194,18 @@
                 card = document.createElement('div');
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
-                card.innerHTML = `<span class="staff-name"></span><span class="timer-display">00:00</span>`;
-                card.onclick = () => openModal(id, localDataCache[id]);
+                // ★ グリップ（≡）を追加
+                card.innerHTML = `
+                    <div class="drag-handle">≡</div>
+                    <span class="staff-name"></span>
+                    <span class="timer-display">00:00</span>
+                `;
+                
+                // モーダルを開く処理（グリップを触った時は開かないようにする）
+                card.onclick = (e) => {
+                    if (e.target.classList.contains('drag-handle')) return;
+                    openModal(id, localDataCache[id]);
+                };
             }
             
             card.querySelector('.staff-name').innerText = staff.name;
@@ -242,10 +242,8 @@
         new Sortable(el, {
             group: 'shared', 
             animation: 150, 
-            // iPadでのスワイプ（スクロール）とドラッグを明確に分けるための設定
-            delay: 100,              // 0.1秒長押しで「ドラッグ」開始
-            delayOnTouchOnly: true, 
-            fallbackTolerance: 10,   // タッチ時の指のブレを許容
+            handle: '.drag-handle', // ★「≡」を触った時だけドラッグ可能にする
+            fallbackTolerance: 5,
             onEnd: handleDragEnd
         });
     });
