@@ -57,10 +57,13 @@
         
         .drag-handle { width: 40px; background: rgba(0,0,0,0.08); color: #555; font-size: 22px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
         .card-content { padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-grow: 1; pointer-events: none; overflow: hidden; }
-        .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
         .timer-display { font-family: monospace; font-weight: bold; font-size: 0.9rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; }
         .no-timer .timer-display { display: none; }
         
+        /* ★休憩済みバッジのスタイル */
+        .break-badge { background: #8e44ad; color: white; padding: 2px 4px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -133,8 +136,10 @@
                 card.innerHTML = `<div class="drag-handle">≡</div><div class="card-content"><div class="staff-name"></div><div class="timer-display">00:00</div></div>`;
             }
             
+            // ★名前の横に学科と「休済」バッジを表示
             const deptText = staff.dept ? `(${staff.dept})` : '';
-            card.querySelector('.staff-name').innerText = `${staff.name}${deptText}`;
+            const breakBadge = staff.has_taken_break ? `<span class="break-badge">☕️休済</span>` : '';
+            card.querySelector('.staff-name').innerHTML = `${staff.name}${deptText} ${breakBadge}`;
             
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
             else card.removeAttribute('data-grade');
@@ -167,31 +172,30 @@
         });
     }
 
-    // ★重要：ドラッグ移動時の自動保存＆自動開始ロジック
     const handleDragEnd = (evt) => {
         const id = evt.item.getAttribute('data-id');
         const fromPos = evt.from.id;
         const toPos = evt.to.id;
         
-        // 同じ場所での移動（並び替え）なら何もしない
         if (fromPos === toPos) return;
 
         let updateData = { position: toPos, startTime: Date.now() };
 
-        // ★① 「対応(working)」に配置された時
-        if (toPos === 'working') {
-            updateData.working_phase = '物件選定中'; // 自動でフェーズをセット
-            updateData.phase_start_time = Date.now();
-            updateData.lap_times = null; // 以前のラップタイムを念のためリセット
+        // ★「休み(break)」に移動した時に自動で休憩済みフラグをONにする
+        if (toPos === 'break') {
+            updateData.has_taken_break = true;
         }
 
-        // ★② 「対応(working)」から別の場所へ移動した時（対応完了）
+        if (toPos === 'working') {
+            updateData.working_phase = '物件選定中'; 
+            updateData.phase_start_time = Date.now();
+            updateData.lap_times = null; 
+        }
+
         if (fromPos === 'working' && toPos !== 'working') {
             const staff = localDataCache[id];
             if (staff) {
                 const now = Date.now();
-                
-                // 最終ラップタイムの計算
                 let finalLaps = staff.lap_times ? { ...staff.lap_times } : {};
                 if (staff.working_phase && staff.phase_start_time) {
                     const elapsed = Math.floor((now - staff.phase_start_time) / 1000);
@@ -199,7 +203,6 @@
                 }
                 const totalTime = staff.startTime ? Math.floor((now - staff.startTime) / 1000) : 0;
 
-                // 履歴データベース（lap_history）に保存
                 firebase.database().ref(`lap_history/${id}`).push({
                     timestamp: now,
                     date: new Date(now).toLocaleString('ja-JP'),
@@ -207,7 +210,6 @@
                     laps_seconds: finalLaps
                 });
 
-                // 現在のカードのラップ情報をリセット
                 updateData.working_phase = null;
                 updateData.phase_start_time = null;
                 updateData.lap_times = null;
