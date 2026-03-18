@@ -35,17 +35,23 @@
         .column-title { font-size: 1rem; margin: 0; font-weight: bold; }
 
         .list-group { flex-grow: 1; padding: 4px; display: grid; gap: 8px; align-content: start; min-height: 100px; }
-        #working, #waiting, #break { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        #working, #waiting, #break { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
         #reception, #klas, #housing, #briefing { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
         #other-working { grid-template-columns: 1fr; }
         
+        /* ★カードのデザイン（縁を太めに変更） */
         .staff-card { 
             --card-bg: #ffffff;
             background: var(--card-bg);
-            border: 1px solid #777; border-radius: 8px; margin: 0; display: flex; align-items: stretch; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15); width: 100%; height: 50px; overflow: hidden; 
+            border: 2px solid #aaa; border-radius: 8px; margin: 0; display: flex; align-items: stretch; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); width: 100%; min-height: 55px; overflow: hidden; 
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.1s ease;
             cursor: default; 
+        }
+        
+        /* ★休憩済みの人は縁が太い紫色になる */
+        .staff-card.break-taken {
+            border: 3px solid #8e44ad !important;
         }
         
         .staff-card[data-grade="1年"] { --card-bg: var(--color-1); }
@@ -55,15 +61,17 @@
         .staff-card[data-grade="修士以上"] { --card-bg: var(--color-m); }
         .staff-card[data-presenter="可"] { background: linear-gradient(to right, var(--card-bg) 50%, #ffb74d 50%); }
         
-        .drag-handle { width: 40px; background: rgba(0,0,0,0.08); color: #555; font-size: 22px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
-        .card-content { padding: 4px 8px; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex-grow: 1; pointer-events: none; overflow: hidden; }
-        .staff-name { font-weight: bold; font-size: 1.05rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
-        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.9rem; color: #444; background: rgba(255,255,255,0.7); padding: 2px 6px; border-radius: 4px; align-self: flex-start; }
+        .drag-handle { width: 35px; background: rgba(0,0,0,0.08); color: #555; font-size: 20px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #ccc; cursor: grab; flex-shrink: 0; touch-action: none; }
+        .card-content { padding: 4px 6px; display: flex; flex-direction: column; justify-content: center; gap: 0px; flex-grow: 1; pointer-events: none; overflow: hidden; }
+        
+        /* ★名前と学科を縦に並べる（改行）設定 */
+        .name-area { display: flex; flex-direction: column; justify-content: center; overflow: hidden; line-height: 1.2; }
+        .staff-name { font-weight: bold; font-size: 0.95rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .staff-dept { font-size: 0.75rem; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .timer-display { font-family: monospace; font-weight: bold; font-size: 0.85rem; color: #444; background: rgba(255,255,255,0.7); padding: 1px 4px; border-radius: 4px; align-self: flex-start; margin-top: 2px;}
         .no-timer .timer-display { display: none; }
         
-        /* ★休憩済みバッジのスタイル */
-        .break-badge { background: #8e44ad; color: white; padding: 2px 4px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-
         .status-warning { background-color: #ffeb3b !important; border: 2px solid #f39c12 !important; animation: flash 1.5s infinite; }
         @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -71,6 +79,7 @@
         .sortable-ghost { opacity: 0.3; background-color: #e0e0e0 !important; border: 2px dashed #999; }
 
         .roster-btn { color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; padding: 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); flex: 1; text-align: center; }
+        .legend-text { text-align: center; font-size: 0.85rem; color: #555; margin-top: 6px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -83,9 +92,14 @@
         <div class="column" id="break-col"><div class="column-header"><h2 class="column-title">休み</h2></div><div id="break" class="list-group" data-timer="true" data-limit="45"></div></div>
     </div>
     <div class="right-grid">
-        <div style="display: flex; gap: 10px;">
-            <button class="roster-btn" style="background: var(--accent);" onclick="window.open('roster.html', '_blank')">📋 名簿一覧</button>
-            <button class="roster-btn" style="background: #e67e22;" onclick="window.open('working_only.html', '_blank')">⏱ 対応のみ表示</button>
+        <div>
+            <div style="display: flex; gap: 10px;">
+                <button class="roster-btn" style="background: var(--accent);" onclick="window.open('roster.html', '_blank')">📋 名簿一覧</button>
+                <button class="roster-btn" style="background: #e67e22;" onclick="window.open('working_only.html', '_blank')">⏱ 対応のみ</button>
+            </div>
+            <div class="legend-text">
+                ※ カードの<span style="color: #8e44ad; font-size: 1rem;">縁が紫色</span>のスタッフは「休憩済み」です
+            </div>
         </div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">受付</h2></div><div id="reception" class="list-group" data-timer="false"></div></div>
         <div class="column no-timer"><div class="column-header"><h2 class="column-title">KLAS</h2></div><div id="klas" class="list-group" data-timer="false"></div></div>
@@ -133,13 +147,29 @@
                 card = document.createElement('div');
                 card.className = 'staff-card';
                 card.setAttribute('data-id', id);
-                card.innerHTML = `<div class="drag-handle">≡</div><div class="card-content"><div class="staff-name"></div><div class="timer-display">00:00</div></div>`;
+                // ★構造を2段表示用に変更
+                card.innerHTML = `
+                    <div class="drag-handle">≡</div>
+                    <div class="card-content">
+                        <div class="name-area">
+                            <div class="staff-name"></div>
+                            <div class="staff-dept"></div>
+                        </div>
+                        <div class="timer-display">00:00</div>
+                    </div>
+                `;
             }
             
-            // ★名前の横に学科と「休済」バッジを表示
-            const deptText = staff.dept ? `(${staff.dept})` : '';
-            const breakBadge = staff.has_taken_break ? `<span class="break-badge">☕️休済</span>` : '';
-            card.querySelector('.staff-name').innerHTML = `${staff.name}${deptText} ${breakBadge}`;
+            // ★名前と学科をそれぞれの段にセット
+            card.querySelector('.staff-name').innerText = staff.name;
+            card.querySelector('.staff-dept').innerText = staff.dept ? `(${staff.dept})` : '';
+            
+            // ★休憩済みの場合はクラスを付与して縁を紫色にする
+            if (staff.has_taken_break) {
+                card.classList.add('break-taken');
+            } else {
+                card.classList.remove('break-taken');
+            }
             
             if(staff.grade) card.setAttribute('data-grade', staff.grade);
             else card.removeAttribute('data-grade');
@@ -181,7 +211,6 @@
 
         let updateData = { position: toPos, startTime: Date.now() };
 
-        // ★「休み(break)」に移動した時に自動で休憩済みフラグをONにする
         if (toPos === 'break') {
             updateData.has_taken_break = true;
         }
